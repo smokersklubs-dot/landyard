@@ -204,7 +204,7 @@ final class Sklubs_Event_Woo {
 				'methods'             => 'GET',
 				'callback'            => function () {
 					$p = self::pricing();
-					return array( 'woocommerce' => self::active(), 'cart' => self::active(), 'pricing' => $p );
+					return array( 'woocommerce' => self::active(), 'cart' => self::active(), 'pricing' => $p, 'catalog' => Sklubs_Event_Options_Page::catalog() );
 				},
 				'permission_callback' => '__return_true',
 			)

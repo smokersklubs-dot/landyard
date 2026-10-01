@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SKLUBS Event Quotes
  * Description:       Reçoit les demandes de devis du configurateur Lanyard (landyard.sklubs.fr) : enregistrement dans l'admin, fichiers (BAT, logo, aperçu), e-mail à l'équipe et accusé de réception au client.
- * Version:           1.2.0
+ * Version:           1.3.0
  * WC requires at least: 7.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'SKLUBS_EQ_FILE', __FILE__ );
 require_once __DIR__ . '/includes/class-woo.php';
 require_once __DIR__ . '/includes/class-pricing-page.php';
+require_once __DIR__ . '/includes/class-options-page.php';
 
 final class Sklubs_Event_Quotes {
 
@@ -178,7 +179,7 @@ final class Sklubs_Event_Quotes {
 			array(
 				'methods'             => 'GET',
 				'callback'            => function () {
-					return array( 'ok' => true, 'version' => '1.2.0', 'woocommerce' => Sklubs_Event_Woo::active() );
+					return array( 'ok' => true, 'version' => '1.3.0', 'woocommerce' => Sklubs_Event_Woo::active() );
 				},
 				'permission_callback' => '__return_true',
 			)
@@ -595,3 +596,4 @@ final class Sklubs_Event_Quotes {
 Sklubs_Event_Quotes::init();
 Sklubs_Event_Woo::init();
 Sklubs_Event_Pricing_Page::init();
+Sklubs_Event_Options_Page::init();

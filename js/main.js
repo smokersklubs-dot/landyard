@@ -39,10 +39,12 @@ const catBig = {};
 let heroCat = 0;
 
 function defaultState(modelId = 'classic') {
-  const m = modelOf(product, modelId);
+  // Modèle masqué dans WordPress (Options) : on prend le premier proposé.
+  const m = modelOf(product, modelId) || product.models[0];
+  modelId = m.id;
   const s = {
     model: modelId, width: m.defaultWidth, length: m.defaultLength, customLength: false,
-    material: m.defaultMaterial, color: '#141414', finish: 'matte', method: m.defaultMethod,
+    material: m.defaultMaterial, color: product.colors.some((c) => c.hex === '#141414') ? '#141414' : product.colors[0].hex, finish: 'matte', method: m.defaultMethod,
     front: { mode: 'repeat', edge: ORANGE, logoOn: true, logoImage: null, logoName: null, textOn: true, text: 'SKLUBS', textColor: '#F4F4F2', iconColor: ORANGE, scale: 62, rotation: 0, spacing: 85, offset: 0 },
     backMode: 'same',
     back: { mode: 'repeat', edge: ORANGE, logoOn: false, logoImage: null, logoName: null, textOn: true, text: 'EVENT 2026', textColor: ORANGE, iconColor: ORANGE, scale: 50, rotation: 0, spacing: 70, offset: 0 },
@@ -258,7 +260,7 @@ function renderPanel() {
   if (id === 'material') {
     html = group('Matière du lanyard', `<div class="list">${m.materials.map((mid) => { const x = product.materials.find((y) => y.id === mid); return `<button class="row ${x.id === state.material ? 'is-on' : ''}" data-k="material" data-v="${x.id}"><i class="weave ${x.weave}" style="--c:${state.color}"></i><span><b>${x.name}</b><small>${x.sub}</small></span></button>`; }).join('')}</div>`) +
       group('Couleur du lanyard', swatches('color', product.colors, state.color) +
-        `<div class="field inline"><label>Couleur personnalisée</label><span class="hex"><input type="color" data-k="color" value="${state.color}"><input type="text" data-k="color" data-t="hex" value="${state.color.toUpperCase()}" maxlength="7"></span></div>`, state.method === 'sublimation' ? 'Fond imprimé' : 'Teinte du ruban') +
+        (product.off?.customColor ? '' : `<div class="field inline"><label>Couleur personnalisée</label><span class="hex"><input type="color" data-k="color" value="${state.color}"><input type="text" data-k="color" data-t="hex" value="${state.color.toUpperCase()}" maxlength="7"></span></div>`), state.method === 'sublimation' ? 'Fond imprimé' : 'Teinte du ruban') +
       group('Finition', `<div class="list compact">${product.finishes.map((f) => `<button class="row radio ${f.id === state.finish ? 'is-on' : ''}" data-k="finish" data-v="${f.id}"><i></i><span><b>${f.name}</b></span></button>`).join('')}</div>`);
   }
   if (id === 'perso') {
@@ -321,8 +323,8 @@ function renderPanel() {
   if (id === 'attach') {
     const atts = allowedAttachments(product, state.model);
     html = group("Type d'attache", `<div class="icon-grid">${atts.map((a) => `<button class="icard ${a.id === state.attachment ? 'is-on' : ''}" data-k="attachment" data-v="${a.id}">${icon(a.id)}<b>${a.name}</b><small>${a.sub}</small></button>`).join('')}</div>`) +
-      group('Sécurité & boucle', (m.pose === 'neck' ? toggle('breakaway', state.breakaway === 'safety', 'Safety breakaway', "S'ouvre à la nuque en cas de traction") : '') +
-        toggle('buckle', state.buckle === 'detachable', 'Boucle détachable', "Détache l'attache du tour de cou")) +
+      group('Sécurité & boucle', (m.pose === 'neck' && !product.off?.breakaway ? toggle('breakaway', state.breakaway === 'safety', 'Safety breakaway', "S'ouvre à la nuque en cas de traction") : '') +
+        (product.off?.buckle ? '' : toggle('buckle', state.buckle === 'detachable', 'Boucle détachable', "Détache l'attache du tour de cou"))) +
       group('Couleur des accessoires', `${swatches('hardwareColor', product.hardwareColors.map((h) => ({ ...h, hex: h.id })), state.hardwareColor).replace(/--c:([a-z]+)/g, (_, id) => `--c:${product.hardwareColors.find((h) => h.id === id).hex}`)}
         <div class="field inline"><label>Personnalisée</label><span class="hex"><input type="color" id="hwCustom" value="${state.hardwareHex}"></span></div>`,
         product.hardwareColors.find((h) => h.id === state.hardwareColor)?.name || 'Personnalisée');
@@ -332,7 +334,7 @@ function renderPanel() {
       html = `<div class="notice"><b>Porte-badge indisponible avec cette configuration.</b><p>${m.pose !== 'neck' ? 'Le modèle choisi ne se porte pas autour du cou.' : "L'attache choisie ne permet pas d'accrocher un porte-badge."}</p>
         ${m.pose === 'neck' ? '<button class="btn ghost" data-k="attachment" data-v="snaphook">Passer au mousqueton standard</button>' : ''}</div>`;
     } else {
-      html = group('Complete your event kit', `<div class="list">${[['lanyard', 'Lanyard seul', 'Le cordon et son attache'], ['holder', 'Lanyard + porte-badge', 'Pochette ou étui'], ['pass', 'Lanyard + porte-badge + pass imprimé', 'Le kit complet, prêt à distribuer']].map(([v, t, sub]) => `<button class="row radio ${state.kit === v ? 'is-on' : ''}" data-k="kit" data-v="${v}"><i></i><span><b>${t}</b><small>${sub}</small></span></button>`).join('')}</div>`);
+      html = group('Complete your event kit', `<div class="list">${[['lanyard', 'Lanyard seul', 'Le cordon et son attache'], ['holder', 'Lanyard + porte-badge', 'Pochette ou étui'], ['pass', 'Lanyard + porte-badge + pass imprimé', 'Le kit complet, prêt à distribuer']].filter(([v]) => !(v === 'pass' && product.off?.pass)).map(([v, t, sub]) => `<button class="row radio ${state.kit === v ? 'is-on' : ''}" data-k="kit" data-v="${v}"><i></i><span><b>${t}</b><small>${sub}</small></span></button>`).join('')}</div>`);
       const tabs = state.kit === 'pass' ? [['holder', 'Porte-badge'], ['badge', 'Badge nominatif'], ['pass', 'Pass VIP']] : state.kit === 'holder' ? [['holder', 'Porte-badge']] : [];
       const bt = tabs.some(([v]) => v === state.ui.badgeTab) ? state.ui.badgeTab : 'holder';
       if (tabs.length > 1) html += `<div class="tabs" role="tablist">${tabs.map(([v, t]) => `<button role="tab" aria-selected="${v === bt}" class="${v === bt ? 'is-on' : ''}" data-k="ui.badgeTab" data-v="${v}">${t}</button>`).join('')}</div>`;
@@ -757,7 +759,36 @@ async function loadWooPricing() {
     product.pricing = { ...product.pricing, ...pricing, priceMode: 'instant' };
     product.quantity.moq = moq ?? null;
     wooCart = !!d.cart;
+    applyCatalog(d.catalog?.disabled || {});
   } catch { /* sklubs.fr injoignable : « Sur devis » */ }
+}
+
+// Options décochées dans WordPress (Devis Event → Options) : retirées du configurateur.
+function applyCatalog(off) {
+  const has = (k, id) => Array.isArray(off[k]) && off[k].includes(id);
+  const keep = (list, k) => { const l = list.filter((x) => !has(k, x.id)); return l.length ? l : list; };
+  product.printingMethods = keep(product.printingMethods, 'printingMethods');
+  const methods = product.printingMethods.map((x) => x.id);
+  for (const k of Object.keys(product.rules.methodsByMaterial)) product.rules.methodsByMaterial[k] = product.rules.methodsByMaterial[k].filter((x) => methods.includes(x));
+  product.materials = keep(product.materials.filter((x) => product.rules.methodsByMaterial[x.id]?.length), 'materials');
+  const mats = product.materials.map((x) => x.id);
+  product.models = keep(product.models.map((x) => {
+    const ms = x.materials.filter((id) => mats.includes(id));
+    return ms.length ? { ...x, materials: ms, defaultMaterial: ms.includes(x.defaultMaterial) ? x.defaultMaterial : ms[0] } : null;
+  }).filter(Boolean), 'models');
+  const models = product.models.map((x) => x.id);
+  product.categories = product.categories.map((c) => (c.model && !models.includes(c.model) ? { ...c, active: false } : c));
+  product.colors = keep(product.colors, 'colors');
+  product.finishes = keep(product.finishes, 'finishes');
+  product.hardwareColors = keep(product.hardwareColors, 'hardwareColors');
+  product.holders = product.holders.filter((x) => x.id === 'none' || !has('holders', x.id));
+  const atts = keep(product.attachments, 'attachments').map((x) => x.id);
+  product.attachments = product.attachments.filter((x) => atts.includes(x.id));
+  for (const pose of Object.keys(product.rules.attachmentsByPose)) {
+    const l = product.rules.attachmentsByPose[pose].filter((id) => atts.includes(id));
+    product.rules.attachmentsByPose[pose] = l.length ? l : [atts[0]];
+  }
+  product.off = Object.fromEntries((off.extras || []).map((k) => [k, true]));
 }
 
 const cartReady = () => wooCart && computePrice(product, state).status !== 'factory';
@@ -911,7 +942,7 @@ function bindGlobal() {
       case 'bagBtn': showProject(); break;
       case 'resumeBtn': {
         const saved = store.get(STORE_KEY);
-        if (saved) { state = sanitize(product, { ...defaultState(saved.model), ...saved, front: { ...defaultState().front, ...saved.front }, back: { ...defaultState().back, ...saved.back }, ui: { dims: false, explode: false, editSide: 'front', persoTab: 'logo', guides: false } }); }
+        if (saved) { state = sanitize(product, { ...defaultState(saved.model), ...saved, model: defaultState(saved.model).model, front: { ...defaultState().front, ...saved.front }, back: { ...defaultState().back, ...saved.back }, ui: { dims: false, explode: false, editSide: 'front', persoTab: 'logo', guides: false } }); }
         step = 0; go('config'); break;
       }
       default: break;

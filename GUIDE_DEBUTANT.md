@@ -123,7 +123,29 @@ Dans la commande, le lien « Voir le BAT, le logo et l'aperçu 3D » est juste s
 
 ---
 
-## 5. Mettre en ligne (une seule fois, ~15 minutes)
+## 5. Choisir ce que le configurateur propose
+
+WordPress → **Devis Event → Options**.
+
+![Options](docs/guide/7-options.jpg)
+
+- **Coché** = proposé aux clients. **Décoché** = caché dans le configurateur (rien n'est supprimé, recoche pour remettre).
+- Exemples : retirer une couleur en rupture, une matière que l'usine ne fait plus, le pass imprimé, la couleur personnalisée.
+- Clique **Enregistrer les options** : le configurateur est à jour au prochain chargement de la page.
+- Il reste toujours au moins un choix par groupe (sinon WordPress garde le premier).
+
+**Tout se gère dans WordPress** (comme l'admin de bags, mais dans le menu « Devis Event ») :
+
+| Menu | À quoi ça sert |
+|---|---|
+| Toutes les demandes | Les devis : client, quantité, statut, fichiers (BAT, logo, aperçu 3D) |
+| Prix | Les prix, le MOQ, les remises |
+| Options | Ce qui est proposé dans le configurateur |
+| Réglages | L'e-mail qui reçoit les devis, les sites autorisés |
+
+---
+
+## 6. Mettre en ligne (une seule fois, ~15 minutes)
 
 ### A. Le plugin WordPress (sur sklubs.fr)
 1. Récupère le fichier **`wordpress-plugin/sklubs-event-quotes.zip`** (dans le dépôt GitHub `landyard`).
@@ -158,7 +180,7 @@ Tu dois recevoir l'e-mail, voir la commande « Devis demandé » et la fiche « 
 
 ---
 
-## 6. Problèmes fréquents
+## 7. Problèmes fréquents
 
 | Ce que tu vois | Pourquoi | Que faire |
 |---|---|---|
@@ -172,7 +194,7 @@ Tu dois recevoir l'e-mail, voir la commande « Devis demandé » et la fiche « 
 
 ---
 
-## 7. Qui fait quoi (pour s'y retrouver)
+## 8. Qui fait quoi (pour s'y retrouver)
 
 | Élément | Où | Rôle |
 |---|---|---|
@@ -181,7 +203,8 @@ Tu dois recevoir l'e-mail, voir la commande « Devis demandé » et la fiche « 
 | `site-chrome.js` | dans le dépôt (copie de bags) | En-tête et pied de page sklubs.fr |
 | Plugin « SKLUBS Event Quotes » | WordPress sklubs.fr | Reçoit les devis, crée les commandes, gère le panier et les prix |
 | Devis Event → Prix | WordPress | **La seule place où tu changes les prix** |
+| Devis Event → Options | WordPress | Modèles, matières, couleurs, attaches… proposés |
 | Devis Event → Réglages | WordPress | E-mail de réception, sites autorisés, accusé de réception |
 
 Une modification du configurateur (texte, couleur proposée…) se fait dans le dépôt GitHub : Vercel remet le site à jour tout seul
-à chaque changement sur la branche `main`. Les prix, eux, se changent uniquement dans WordPress.
+à chaque changement sur la branche `main`. Les prix et les options proposées, eux, se changent uniquement dans WordPress.

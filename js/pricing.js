@@ -33,9 +33,15 @@ export function sanitize(product, cfg) {
   if (!methods.includes(cfg.method)) cfg.method = methods.includes(model.defaultMethod) ? model.defaultMethod : methods[0];
   const atts = allowedAttachments(product, cfg.model).map((a) => a.id);
   if (!atts.includes(cfg.attachment)) cfg.attachment = model.defaultAttachment && atts.includes(model.defaultAttachment) ? model.defaultAttachment : atts[0];
-  if (model.pose !== 'neck') cfg.breakaway = 'none';
+  if (model.pose !== 'neck' || product.off?.breakaway) cfg.breakaway = 'none';
+  if (product.off?.buckle) cfg.buckle = 'none';
+  if (product.off?.pass && cfg.kit === 'pass') cfg.kit = 'holder';
+  if (!product.finishes.some((f) => f.id === cfg.finish)) cfg.finish = product.finishes[0]?.id;
+  if (cfg.hardwareColor !== 'custom' && !product.hardwareColors.some((h) => h.id === cfg.hardwareColor)) cfg.hardwareColor = product.hardwareColors[0]?.id;
+  if (!product.holders.some((h) => h.id === cfg.holder)) cfg.holder = product.holders.find((h) => h.id !== 'none')?.id || 'none';
   if (!canHoldBadge(product, cfg)) cfg.kit = 'lanyard';
-  if (cfg.kit !== 'lanyard' && cfg.holder === 'none') cfg.holder = 'pvcsoft';
+  if (cfg.kit !== 'lanyard' && cfg.holder === 'none') cfg.holder = product.holders.find((h) => h.id !== 'none')?.id || 'none';
+  if (cfg.kit !== 'lanyard' && cfg.holder === 'none') cfg.kit = 'lanyard';
   return cfg;
 }
 
