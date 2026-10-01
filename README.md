@@ -1,5 +1,7 @@
 # SKLUBS EVENT 3D — Configurateur Lanyard
 
+> **Nouveau ? Commence par le [guide débutant](GUIDE_DEBUTANT.md).**
+
 Premier produit du moteur **SKLUBS EVENT 3D** : un lanyard entièrement paramétrique,
 assemblé à partir de pièces modulaires, dans la DA blanche futuriste SKLUBS (accent orange `#FF6A00`).
 
@@ -16,7 +18,7 @@ Site statique, aucune étape de build. Three.js est servi depuis `vendor/` (aucu
    (en général `CNAME landyard → cname.vercel-dns.com`). HTTPS est automatique.
 3. **WooCommerce et devis** : installer le plugin WordPress `wordpress-plugin/sklubs-event-quotes.zip` sur sklubs.fr.
    Chaque devis crée une commande WooCommerce « Devis demandé » (+ fiche avec BAT, logo, aperçu, e-mails).
-   Quand la grille de prix est saisie dans WordPress, le bouton « Ajouter au panier » envoie le lanyard dans le panier sklubs.fr.
+   Quand les prix sont saisis dans WordPress (Devis Event → Prix), le bouton « Ajouter au panier » envoie le lanyard dans le panier sklubs.fr.
    Guide pas à pas : [`docs/INSTALLATION_SKLUBS_FR.md`](docs/INSTALLATION_SKLUBS_FR.md).
 4. **Analytics** (facultatif) : ajouter le snippet Google Tag Manager / GA4 dans `index.html` ;
    les événements du configurateur sont déjà poussés dans `window.dataLayer`.

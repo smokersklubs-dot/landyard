@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       SKLUBS Event Quotes
  * Description:       Reçoit les demandes de devis du configurateur Lanyard (landyard.sklubs.fr) : enregistrement dans l'admin, fichiers (BAT, logo, aperçu), e-mail à l'équipe et accusé de réception au client.
- * Version:           1.1.0
+ * Version:           1.2.0
  * WC requires at least: 7.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
@@ -16,6 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'SKLUBS_EQ_FILE', __FILE__ );
 require_once __DIR__ . '/includes/class-woo.php';
+require_once __DIR__ . '/includes/class-pricing-page.php';
 
 final class Sklubs_Event_Quotes {
 
@@ -57,6 +58,7 @@ final class Sklubs_Event_Quotes {
 		add_action( 'manage_' . self::CPT . '_posts_custom_column', array( __CLASS__, 'column' ), 10, 2 );
 		add_action( 'admin_post_sklubs_quote_file', array( __CLASS__, 'download' ) );
 		add_shortcode( 'sklubs_lanyard_button', array( __CLASS__, 'shortcode' ) );
+		add_action( 'template_redirect', array( __CLASS__, 'redirect_page' ) );
 		register_activation_hook( __FILE__, array( __CLASS__, 'activate' ) );
 	}
 
@@ -77,7 +79,41 @@ final class Sklubs_Event_Quotes {
 	public static function activate() {
 		self::register_cpt();
 		self::storage_dir();
+		self::ensure_page();
 		flush_rewrite_rules();
+	}
+
+	/**
+	 * Page sklubs.fr/configurateur-de-lanyards-personnalises/ : redirige vers landyard.sklubs.fr,
+	 * comme /configurateur-de-sacs-personnalises/ redirige vers bags.sklubs.fr.
+	 */
+	public static function ensure_page() {
+		$id = (int) get_option( 'sklubs_event_page_id' );
+		if ( $id && get_post( $id ) && 'trash' !== get_post_status( $id ) ) {
+			return $id;
+		}
+		$existing = get_page_by_path( 'configurateur-de-lanyards-personnalises' );
+		$id       = $existing ? $existing->ID : wp_insert_post(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_title'   => 'Configurateur de lanyards personnalisés',
+				'post_name'    => 'configurateur-de-lanyards-personnalises',
+				'post_content' => '[sklubs_lanyard_button text="Ouvrir le configurateur 3D"]',
+			)
+		);
+		if ( $id && ! is_wp_error( $id ) ) {
+			update_option( 'sklubs_event_page_id', (int) $id );
+		}
+		return $id;
+	}
+
+	public static function redirect_page() {
+		$id = (int) get_option( 'sklubs_event_page_id' );
+		if ( $id && is_page( $id ) && ! is_preview() && ! current_user_can( 'edit_pages' ) ) {
+			wp_redirect( esc_url_raw( self::settings()['configurator'] ), 301 );
+			exit;
+		}
 	}
 
 	/** Dossier privé des fichiers : uploads/sklubs-quotes (accès direct refusé). */
@@ -142,7 +178,7 @@ final class Sklubs_Event_Quotes {
 			array(
 				'methods'             => 'GET',
 				'callback'            => function () {
-					return array( 'ok' => true, 'version' => '1.1.0', 'woocommerce' => Sklubs_Event_Woo::active() );
+					return array( 'ok' => true, 'version' => '1.2.0', 'woocommerce' => Sklubs_Event_Woo::active() );
 				},
 				'permission_callback' => '__return_true',
 			)
@@ -504,24 +540,6 @@ final class Sklubs_Event_Quotes {
 	public static function register_settings() {
 		register_setting(
 			'sklubs_quotes',
-			Sklubs_Event_Woo::PRICING_OPT,
-			array(
-				'sanitize_callback' => function ( $v ) {
-					$v = trim( wp_unslash( (string) $v ) );
-					if ( '' === $v ) {
-						return '';
-					}
-					$d = json_decode( $v, true );
-					if ( ! is_array( $d ) ) {
-						add_settings_error( 'sklubs_quotes', 'sk_pricing', 'Grille de prix : JSON invalide, ancienne grille conservée.' );
-						return get_option( Sklubs_Event_Woo::PRICING_OPT, '' );
-					}
-					return wp_json_encode( $d, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-				},
-			)
-		);
-		register_setting(
-			'sklubs_quotes',
 			self::OPTION,
 			array(
 				'sanitize_callback' => function ( $v ) {
@@ -553,10 +571,8 @@ final class Sklubs_Event_Quotes {
 						<td><label><input type="checkbox" name="<?php echo esc_attr( $opt ); ?>[confirm_client]" value="1" <?php checked( $s['confirm_client'], 1 ); ?>> Envoyer un e-mail de confirmation au client</label></td></tr>
 					<tr><th><label for="sk-c">Adresse du configurateur</label></th>
 						<td><input id="sk-c" class="regular-text" name="<?php echo esc_attr( $opt ); ?>[configurator]" value="<?php echo esc_attr( $s['configurator'] ); ?>"><p class="description">Utilisée par le bouton <code>[sklubs_lanyard_button]</code>.</p></td></tr>
-					<tr><th><label for="sk-p">Grille de prix (HT)</label></th>
-						<td><textarea id="sk-p" class="large-text code" rows="18" name="<?php echo esc_attr( Sklubs_Event_Woo::PRICING_OPT ); ?>"><?php echo esc_textarea( get_option( Sklubs_Event_Woo::PRICING_OPT ) ? get_option( Sklubs_Event_Woo::PRICING_OPT ) : Sklubs_Event_Woo::PRICING_TEMPLATE ); ?></textarea>
-						<p class="description">Remplacez les <code>null</code> par vos prix HT unitaires (ex. <code>0.85</code>), le MOQ et les remises (<code>[{"min": 1000, "discount": 0.1}]</code>).
-						Tant qu'un prix manque, le configurateur affiche « Sur devis » ; quand tout est rempli, il affiche le prix et le bouton « Ajouter au panier ». Le prix est recalculé ici, jamais repris du navigateur.</p></td></tr>
+					<tr><th>Prix</th>
+						<td><a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . self::CPT . '&page=sklubs-quotes-pricing' ) ); ?>">Saisir les prix du configurateur</a></td></tr>
 					<tr><th>WooCommerce</th>
 						<td><?php echo Sklubs_Event_Woo::active() ? 'Actif : chaque devis crée une commande « Devis demandé ».' : 'Non détecté : les devis sont seulement enregistrés ici.'; ?></td></tr>
 				</table>
@@ -578,3 +594,4 @@ final class Sklubs_Event_Quotes {
 
 Sklubs_Event_Quotes::init();
 Sklubs_Event_Woo::init();
+Sklubs_Event_Pricing_Page::init();

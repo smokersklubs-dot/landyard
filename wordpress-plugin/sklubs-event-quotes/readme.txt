@@ -1,7 +1,7 @@
 === SKLUBS Event Quotes ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 
 Reçoit les demandes de devis du configurateur Lanyard (landyard.sklubs.fr).
 
@@ -13,6 +13,8 @@ Reçoit les demandes de devis du configurateur Lanyard (landyard.sklubs.fr).
 * E-mail à l'équipe avec BAT, logo et aperçu en pièces jointes ; accusé de réception au client.
 * Sécurité : origines autorisées, champ piège anti-spam, 5 demandes / 10 min par adresse IP,
   types de fichiers vérifiés, 10 Mo max par fichier.
+* Page « Prix » : un tableau simple pour saisir les prix (Devis Event → Prix).
+* Page sklubs.fr/configurateur-de-lanyards-personnalises/ créée à l'activation, redirige vers landyard.sklubs.fr.
 * Bouton à placer dans une page : [sklubs_lanyard_button text="Configurer mon lanyard"].
 
 == Réglages ==

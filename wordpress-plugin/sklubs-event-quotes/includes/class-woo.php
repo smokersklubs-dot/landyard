@@ -5,7 +5,7 @@
  * 1. Chaque demande de devis crée une commande WooCommerce au statut « Devis demandé »
  *    (client, ligne « Lanyard personnalisé », configuration, fichiers). L'équipe saisit le prix,
  *    passe la commande « En attente de paiement » et envoie au client le lien de paiement WooCommerce.
- * 2. Panier direct : quand la grille de prix est saisie (Devis Event → Réglages), le configurateur
+ * 2. Panier direct : quand la grille de prix est saisie (Devis Event → Prix), le configurateur
  *    peut ajouter le lanyard au panier de sklubs.fr. Le prix est toujours recalculé ici, côté serveur.
  */
 

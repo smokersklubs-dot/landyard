@@ -1,3 +1,5 @@
+> Version pas à pas pour débutant : [`GUIDE_DEBUTANT.md`](../GUIDE_DEBUTANT.md).
+
 # Mise en ligne et connexion à sklubs.fr
 
 Comme les autres configurateurs SKLUBS (bags.sklubs.fr…), le lanyard vit sur un **sous-domaine Vercel :
@@ -24,8 +26,9 @@ Le lien « Voir le BAT, le logo et l'aperçu 3D » est sous la ligne de la comma
 3. Nouveau menu **Devis Event → Réglages** :
    - *E-mails qui reçoivent les devis* : l'adresse de l'équipe (plusieurs possibles, séparées par des virgules) ;
    - *Sites autorisés* : laisser `https://landyard.sklubs.fr` et `https://sklubs.fr` ;
-   - *Accusé de réception* : coché ;
-   - *Grille de prix (HT)* : laisser les `null` tant que les prix fournisseur ne sont pas connus (voir § 5).
+   - *Accusé de réception* : coché.
+   L'activation crée aussi la page `sklubs.fr/configurateur-de-lanyards-personnalises/` qui redirige vers
+   landyard.sklubs.fr, comme `/configurateur-de-sacs-personnalises/` pour bags.
 4. Vérifier : ouvrir <https://sklubs.fr/wp-json/sklubs/v1/ping> → doit afficher `{"ok":true,...}`.
 
 > Si un plugin de sécurité (Wordfence, Hostinger, LiteSpeed…) bloque l'API REST, autoriser la route `/wp-json/sklubs/v1/`.
@@ -58,8 +61,8 @@ sur tous les configurateurs, l'ajouter dans le menu source puis recopier `site-c
 
 ## 5. Activer le panier : la grille de prix
 
-Devis Event → Réglages → *Grille de prix (HT)* : remplacer chaque `null` par le prix unitaire HT en euros
-(ex. `"classic": 0.62`), saisir le `moq` et, si besoin, les remises `"quantityDiscounts": [{"min": 1000, "discount": 0.08}]`.
+**Devis Event → Prix** : un tableau avec une case par prix (HT, en euros, `0,62`), le MOQ et les remises par quantité.
+Case vide = prix inconnu.
 Dès que tout est rempli, le configurateur affiche les prix en direct et le bouton « Ajouter au panier ».
 Tant qu'une valeur manque pour la configuration choisie, il reste en « Sur devis ».
 
