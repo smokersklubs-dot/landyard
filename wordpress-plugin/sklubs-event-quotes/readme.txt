@@ -1,7 +1,7 @@
 === SKLUBS Event Quotes ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 
 Reçoit les demandes de devis du configurateur Lanyard (landyard.sklubs.fr).
 

@@ -14,8 +14,9 @@ Site statique, aucune étape de build. Three.js est servi depuis `vendor/` (aucu
 2. **Domaine** : *Project → Settings → Domains*, ajouter `landyard.sklubs.fr`.
    Chez le gestionnaire DNS de `sklubs.fr`, créer l'enregistrement indiqué par Vercel
    (en général `CNAME landyard → cname.vercel-dns.com`). HTTPS est automatique.
-3. **Devis** : installer le plugin WordPress `wordpress-plugin/sklubs-event-quotes.zip` sur sklubs.fr.
-   Les demandes arrivent dans l'admin (menu « Devis Event ») avec BAT, logo et aperçu, plus un e-mail à l'équipe.
+3. **WooCommerce et devis** : installer le plugin WordPress `wordpress-plugin/sklubs-event-quotes.zip` sur sklubs.fr.
+   Chaque devis crée une commande WooCommerce « Devis demandé » (+ fiche avec BAT, logo, aperçu, e-mails).
+   Quand la grille de prix est saisie dans WordPress, le bouton « Ajouter au panier » envoie le lanyard dans le panier sklubs.fr.
    Guide pas à pas : [`docs/INSTALLATION_SKLUBS_FR.md`](docs/INSTALLATION_SKLUBS_FR.md).
 4. **Analytics** (facultatif) : ajouter le snippet Google Tag Manager / GA4 dans `index.html` ;
    les événements du configurateur sont déjà poussés dans `window.dataLayer`.
@@ -70,6 +71,7 @@ ou glisser-déposer d'un fichier n'importe où sur la page. Il est appliqué au 
 | `wordpress-plugin/` | Plugin WordPress « SKLUBS Event Quotes » (source + .zip à installer sur sklubs.fr) |
 | `hardware-master/` | Pièces 3D Blender (script `scripts/build_hardware.py`, `.blend`, un GLB par pièce) |
 | `vendor/three/` | Three.js 0.170 (licence MIT) servi avec le site |
+| `site-chrome.js` | En-tête et pied de page communs SKLUBS (repris de bags.sklubs.fr) |
 | `vercel.json` | En-têtes de cache et de sécurité pour Vercel |
 | `tools/build_preview.py` | Version autonome (un seul HTML) pour l'aperçu hébergé |
 

@@ -24,16 +24,13 @@
 <body>
   <noscript><p class="noscript">Le configurateur SKLUBS a besoin de JavaScript pour afficher la 3D.</p></noscript>
   <header class="nav">
-    <button class="wordmark" data-go="home" aria-label="Accueil SKLUBS">SKLUBS</button>
+    <button class="wordmark" data-go="home" aria-label="Accueil du configurateur">SKLUBS <span>EVENT 3D</span></button>
     <nav class="nav-links">
       <button data-go="category">Produits</button>
       <button data-go="config">Configurateur</button>
-      <a href="https://sklubs.fr/portfolio/">Inspiration</a>
-      <a href="https://sklubs.fr/a-propos/">À propos</a>
     </nav>
     <div class="nav-icons">
-      <a class="icon-btn plain" href="https://sklubs.fr/?s=" aria-label="Rechercher sur sklubs.fr"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></a>
-      <a class="icon-btn plain" href="https://sklubs.fr/mon-compte/" aria-label="Mon compte SKLUBS"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"/></svg></a>
+      <a class="icon-btn plain" href="https://sklubs.fr/panier/" aria-label="Panier sklubs.fr"><svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2.4l2.2 11h10.8l2-8H6.2"/></svg></a>
       <button class="icon-btn plain bag" id="bagBtn" aria-label="Mon projet"><svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg><i id="bagCount" hidden>0</i></button>
       <button class="btn primary small" data-go="quote">Demander un devis</button>
     </div>
@@ -123,10 +120,6 @@
     </div>
   </section>
 
-  <footer class="site-foot">
-    <a href="https://sklubs.fr/" class="foot-back">← Retour sur sklubs.fr</a>
-    <nav aria-label="Liens SKLUBS"><a href="https://sklubs.fr/configurateurs-produits/">Tous les configurateurs</a><a href="https://sklubs.fr/delais-moq-livraison/">Délais, MOQ &amp; livraison</a><a href="https://sklubs.fr/contact/">Contact</a></nav>
-  </footer>
   <div class="studio" id="studio" aria-hidden="true"></div>
   <div class="drop-overlay" aria-hidden="true"><div><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg><b>Déposez votre logo</b><span>SVG, PDF, PNG ou JPG — il s'applique directement sur le ruban</span></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -140,6 +133,7 @@
   <input type="file" id="passFile" accept="image/svg+xml,image/png,image/jpeg" hidden>
   <input type="file" id="logoFile" accept="image/svg+xml,application/pdf,image/png,image/jpeg" hidden>
 
+  <script src="site-chrome.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

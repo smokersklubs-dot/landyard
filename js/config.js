@@ -10,6 +10,11 @@ export const CONFIG = {
     subject: 'Demande de devis — Lanyard SKLUBS',
   },
   site: 'https://sklubs.fr',
+  // WooCommerce (plugin « SKLUBS Event Quotes ») : grille de prix lue sur sklubs.fr, panier sklubs.fr.
+  woo: {
+    pricing: 'https://sklubs.fr/wp-json/sklubs/v1/pricing',
+    cart: 'https://sklubs.fr/wp-json/sklubs/v1/cart',
+  },
   // Analytics : les événements sont poussés dans window.dataLayer (Google Tag Manager, GA4, etc.).
   analytics: true,
 };

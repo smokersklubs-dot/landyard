@@ -1,10 +1,20 @@
 # Mise en ligne et connexion à sklubs.fr
 
-Le configurateur vit sur **landyard.sklubs.fr** (Vercel). sklubs.fr (WordPress + WooCommerce, Hostinger, derrière Cloudflare)
-y envoie les visiteurs par des liens, et **reçoit les demandes de devis** grâce au plugin « SKLUBS Event Quotes ».
+Comme les autres configurateurs SKLUBS (bags.sklubs.fr…), le lanyard vit sur un **sous-domaine Vercel :
+landyard.sklubs.fr**, avec le même en-tête et pied de page que sklubs.fr (`site-chrome.js`, repris de bags).
+Il est **relié à WooCommerce** par le plugin « SKLUBS Event Quotes » installé sur sklubs.fr :
 
-Le configurateur renvoie déjà vers sklubs.fr : Inspiration (portfolio), À propos, recherche, Mon compte,
-« Retour sur sklubs.fr », tous les configurateurs, délais & MOQ, contact.
+| Situation | Bouton principal | Ce qui se passe dans WooCommerce |
+|---|---|---|
+| Grille de prix incomplète (aujourd'hui) | **Demander un devis** | Commande créée au statut **« Devis demandé »** (client, ligne « Lanyard personnalisé », configuration). Fiche « Devis Event » avec BAT, logo, aperçu. E-mail à l'équipe + accusé de réception au client. |
+| Grille de prix remplie | **Ajouter au panier** | Le lanyard est ajouté au **panier de sklubs.fr** avec son prix (recalculé côté serveur) ; le client paie avec le tunnel WooCommerce habituel. |
+
+### Chiffrer un devis dans WooCommerce
+WooCommerce → Commandes → filtre « Devis demandé » → ouvrir la commande :
+1. saisir le prix de la ligne « Lanyard personnalisé » (total du lot), cliquer « Recalculer » ;
+2. passer le statut à **« En attente de paiement »** et enregistrer ;
+3. Actions de commande → **« Envoyer la facture / les détails de commande au client »** : le client reçoit un lien de paiement.
+Le lien « Voir le BAT, le logo et l'aperçu 3D » est sous la ligne de la commande.
 
 ## 1. Installer le plugin sur sklubs.fr (5 min)
 
@@ -14,7 +24,8 @@ Le configurateur renvoie déjà vers sklubs.fr : Inspiration (portfolio), À pro
 3. Nouveau menu **Devis Event → Réglages** :
    - *E-mails qui reçoivent les devis* : l'adresse de l'équipe (plusieurs possibles, séparées par des virgules) ;
    - *Sites autorisés* : laisser `https://landyard.sklubs.fr` et `https://sklubs.fr` ;
-   - *Accusé de réception* : coché.
+   - *Accusé de réception* : coché ;
+   - *Grille de prix (HT)* : laisser les `null` tant que les prix fournisseur ne sont pas connus (voir § 5).
 4. Vérifier : ouvrir <https://sklubs.fr/wp-json/sklubs/v1/ping> → doit afficher `{"ok":true,...}`.
 
 > Si un plugin de sécurité (Wordfence, Hostinger, LiteSpeed…) bloque l'API REST, autoriser la route `/wp-json/sklubs/v1/`.
@@ -36,13 +47,23 @@ Le configurateur renvoie déjà vers sklubs.fr : Inspiration (portfolio), À pro
 
 ## 4. Ajouter les liens sur sklubs.fr
 
+Le menu commun (`site-chrome.js`) est le même que sur bags.sklubs.fr : pour que « Lanyards 3D » y apparaisse
+sur tous les configurateurs, l'ajouter dans le menu source puis recopier `site-chrome.js` dans ce dépôt.
+
 - **Menu** : Apparence → Menus (ou Elementor → Header) → lien personnalisé
   `https://landyard.sklubs.fr`, libellé « Lanyards 3D ».
 - **Page « Configurateurs produits »** (`/configurateurs-produits/`) : ajouter une carte Lanyard avec le bouton
   `[sklubs_lanyard_button text="Configurer mon lanyard en 3D"]` (widget « Code court » dans Elementor).
 - Même bouton possible sur les pages produits liées (badges, goodies, événementiel).
 
-## 5. Tester
+## 5. Activer le panier : la grille de prix
+
+Devis Event → Réglages → *Grille de prix (HT)* : remplacer chaque `null` par le prix unitaire HT en euros
+(ex. `"classic": 0.62`), saisir le `moq` et, si besoin, les remises `"quantityDiscounts": [{"min": 1000, "discount": 0.08}]`.
+Dès que tout est rempli, le configurateur affiche les prix en direct et le bouton « Ajouter au panier ».
+Tant qu'une valeur manque pour la configuration choisie, il reste en « Sur devis ».
+
+## 6. Tester
 
 Sur landyard.sklubs.fr : configurer un lanyard, importer un logo, étape 12 → **Demander un devis** → remplir le formulaire.
 Résultat attendu :

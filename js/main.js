@@ -60,6 +60,7 @@ function defaultState(modelId = 'classic') {
 // ---------- Démarrage ----------
 async function init() {
   product = window.SKLUBS_PRODUCT || await (await fetch(PRODUCT_URL)).json();
+  await loadWooPricing();
   await ensureFonts();
   state = defaultState();
   track('event_configurator_started');
@@ -133,7 +134,9 @@ function go(page) {
   $$('.nav-links button').forEach((b) => b.classList.toggle('is-active', b.dataset.go === page || (page === 'category' && b.dataset.go === 'category')));
   hero.motion = page === 'home';
   if (page === 'config') { viewer.resize(); setStep(step, true); }
-  window.scrollTo(0, 0);
+  // L'en-tête commun sklubs.fr défile ; le configurateur se cale sous la barre d'app.
+  const bar = document.querySelector('.nav');
+  window.scrollTo(0, page === 'config' && bar ? bar.offsetTop : 0);
 }
 
 function setStep(i, force = false) {
@@ -361,14 +364,14 @@ function renderPanel() {
       }).join('')}</tbody></table>
       <div class="field inline"><label>Quantité libre</label><input type="number" id="qtyInput" min="1" step="1" value="${state.quantity}"></div>
       <div class="price-big" id="priceBig"></div>
-      <button class="btn primary wide" id="addProject">Ajouter au projet <span class="arrow">→</span></button>
+      ${cartReady() ? '<button class="btn primary wide" id="addCart">Ajouter au panier <span class="arrow">→</span></button><button class="btn outline wide" id="addProject">Ajouter au projet</button>' : '<button class="btn primary wide" id="addProject">Ajouter au projet <span class="arrow">→</span></button>'}
       <p class="note">Prix estimatifs, validation usine incluse. ${computePrice(product, state).status === 'factory' ? 'Tarifs fournisseur non renseignés : chaque projet est validé et chiffré par l\'usine.' : ''}</p>`;
   }
   if (id === 'final') {
     html = `<h2 class="ready">Votre lanyard est prêt !</h2><dl class="recap">${recap().map(([a, b]) => `<div><dt>${a}</dt><dd>${esc(b)}</dd></div>`).join('')}</dl>
       <div class="final-actions">
-        <button class="btn primary" id="addProject">Ajouter au projet <span class="arrow">→</span></button>
-        <button class="btn outline" id="quoteBtn">Demander un devis</button>
+        ${cartReady() ? '<button class="btn primary" id="addCart">Ajouter au panier <span class="arrow">→</span></button><button class="btn outline" id="quoteBtn">Demander un devis</button>'
+          : '<button class="btn primary" id="quoteBtn">Demander un devis <span class="arrow">→</span></button><button class="btn outline" id="addProject">Ajouter au projet</button>'}
         <button class="btn outline" id="saveBtn">Sauvegarder mon projet</button>
         <div class="bat-row"><button class="link-btn" id="batView">Voir le BAT</button><button class="link-btn" id="batBtn">Télécharger le BAT (PDF + SVG)</button></div>
       </div>`;
@@ -736,6 +739,62 @@ async function sendQuote() {
   }
 }
 
+// ---------- WooCommerce (sklubs.fr) ----------
+let wooCart = false;
+// Grille de prix saisie dans WordPress (Devis Event → Réglages) : seule source des prix affichés.
+async function loadWooPricing() {
+  const url = CONFIG.woo?.pricing;
+  if (!url || window.SKLUBS_PREVIEW) return;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    clearTimeout(timer);
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!d?.pricing) return;
+    const { moq, baseLengthByModel, ...pricing } = d.pricing;
+    product.pricing = { ...product.pricing, ...pricing, priceMode: 'instant' };
+    product.quantity.moq = moq ?? null;
+    wooCart = !!d.cart;
+  } catch { /* sklubs.fr injoignable : « Sur devis » */ }
+}
+
+const cartReady = () => wooCart && computePrice(product, state).status !== 'factory';
+
+async function addToCart(btn) {
+  const label = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Préparation du panier…';
+  try {
+    const { preview_image, logo_files, ...light } = buildProject();
+    const blob = async (u) => (await fetch(u)).blob();
+    const fd = new FormData();
+    fd.append('reference', projectRef());
+    fd.append('summary', recap().map(([a, b]) => `${a} : ${b}`).join('\n'));
+    fd.append('configuration', JSON.stringify(light));
+    const bat = makeBAT();
+    fd.append('bat', await batPDF(bat), `BAT-${projectRef()}.pdf`);
+    fd.append('bat_svg', new Blob([bat.svg], { type: 'image/svg+xml' }), `BAT-${projectRef()}.svg`);
+    fd.append('preview', await blob(preview_image), `apercu-${projectRef()}.png`);
+    if (state.front.logoData) fd.append('logo', await blob(state.front.logoData), state.front.logoName);
+    if (state.backMode === 'different' && state.back.logoData) fd.append('logo_back', await blob(state.back.logoData), state.back.logoName);
+    if (state.kit === 'pass' && state.passArt?.logoData) fd.append('pass_art', await blob(state.passArt.logoData), state.passArt.logoName);
+    const res = await fetch(CONFIG.woo.cart, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out.url) {
+      btn.disabled = false; btn.innerHTML = label;
+      toast(out.message || "Le panier n'a pas pu être préparé : demandez un devis.");
+      if (res.status === 409) openQuote();
+      return;
+    }
+    track('add_to_cart', { reference: projectRef(), value: out.total, currency: out.currency });
+    location.href = out.url;
+  } catch {
+    btn.disabled = false; btn.innerHTML = label;
+    toast("Connexion à sklubs.fr impossible. Réessayez ou demandez un devis.");
+  }
+}
+
 // ---------- Analytics ----------
 function track(event, params = {}) {
   if (!CONFIG.analytics) return;
@@ -845,6 +904,7 @@ function bindGlobal() {
         updateBag(); toast('Ajouté à votre projet.'); track('project_added'); break;
       }
       case 'quoteBtn': openQuote(); break;
+      case 'addCart': addToCart(t); break;
       case 'batBtn': downloadBAT(); break;
       case 'batView': showBAT(); break;
       case 'saveBtn': store.set(STORE_KEY, serializable()); exportProject(); if (!window.SKLUBS_PREVIEW) toast('Projet enregistré sur cet appareil et téléchargé.'); break;

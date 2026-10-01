@@ -66,10 +66,11 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--ink);
 
 /* ---------- Navigation ---------- */
 .nav {
-  position: sticky; top: 0; z-index: 20; height: var(--nav); display: flex; align-items: center; gap: 36px;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; height: var(--nav); display: flex; align-items: center; gap: 36px;
   padding: 0 28px; background: rgba(255,255,255,.86); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
 }
-.wordmark { font-weight: 800; font-size: 21px; letter-spacing: -.02em; font-style: italic; transform: skewX(-4deg); }
+.wordmark { font-weight: 800; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; }
+.wordmark span { font: 500 11px var(--mono); letter-spacing: .14em; color: var(--accent); margin-left: 6px; }
 .nav-links { display: flex; gap: 24px; }
 .nav-links a { font-size: 13px; color: var(--ink-2); padding: 6px 0; text-decoration: none; border-bottom: 2px solid transparent; }
 .nav-links a:hover { color: var(--ink); }

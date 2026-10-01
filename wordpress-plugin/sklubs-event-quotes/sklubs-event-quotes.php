@@ -2,7 +2,8 @@
 /**
  * Plugin Name:       SKLUBS Event Quotes
  * Description:       Reçoit les demandes de devis du configurateur Lanyard (landyard.sklubs.fr) : enregistrement dans l'admin, fichiers (BAT, logo, aperçu), e-mail à l'équipe et accusé de réception au client.
- * Version:           1.0.0
+ * Version:           1.1.0
+ * WC requires at least: 7.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            SKLUBS
@@ -12,6 +13,9 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+define( 'SKLUBS_EQ_FILE', __FILE__ );
+require_once __DIR__ . '/includes/class-woo.php';
 
 final class Sklubs_Event_Quotes {
 
@@ -138,7 +142,7 @@ final class Sklubs_Event_Quotes {
 			array(
 				'methods'             => 'GET',
 				'callback'            => function () {
-					return array( 'ok' => true, 'version' => '1.0.0' );
+					return array( 'ok' => true, 'version' => '1.1.0', 'woocommerce' => Sklubs_Event_Woo::active() );
 				},
 				'permission_callback' => '__return_true',
 			)
@@ -177,14 +181,14 @@ final class Sklubs_Event_Quotes {
 		return sanitize_text_field( wp_unslash( $ip ) );
 	}
 
-	public static function handle( WP_REST_Request $req ) {
+	/** Contrôles communs aux routes publiques : origine, champ piège, limite de débit. */
+	public static function guard( WP_REST_Request $req ) {
 		$origin = get_http_origin();
 		if ( $origin && ! in_array( untrailingslashit( $origin ), self::allowed_origins(), true ) ) {
 			return self::error( 'sklubs_origin', 'Origine non autorisée.', 403 );
 		}
-		// Anti-spam : champ piège invisible pour les humains.
 		if ( '' !== trim( (string) $req->get_param( 'website' ) ) ) {
-			return array( 'ok' => true, 'reference' => 'SK-0' );
+			return self::error( 'sklubs_spam', 'Demande refusée.', 400 );
 		}
 		$key  = 'sklubs_q_' . md5( self::client_ip() );
 		$hits = (int) get_transient( $key );
@@ -192,6 +196,18 @@ final class Sklubs_Event_Quotes {
 			return self::error( 'sklubs_rate', 'Trop de demandes. Réessayez dans quelques minutes.', 429 );
 		}
 		set_transient( $key, $hits + 1, self::RATE_WIN );
+		return true;
+	}
+
+	public static function handle( WP_REST_Request $req ) {
+		// Champ piège rempli : on répond « ok » sans rien enregistrer (le robot ne voit pas la différence).
+		if ( '' !== trim( (string) $req->get_param( 'website' ) ) ) {
+			return array( 'ok' => true, 'reference' => 'SK-0' );
+		}
+		$guard = self::guard( $req );
+		if ( is_wp_error( $guard ) ) {
+			return $guard;
+		}
 
 		$name  = sanitize_text_field( (string) $req->get_param( 'name' ) );
 		$email = sanitize_email( (string) $req->get_param( 'email' ) );
@@ -244,12 +260,13 @@ final class Sklubs_Event_Quotes {
 		$files = self::store_files( $req->get_file_params(), $post_id, $ref );
 		update_post_meta( $post_id, '_sk_files', $files );
 
-		self::notify( $post_id, $ref, $contact, $summary, $files );
+		$order_id = Sklubs_Event_Woo::order_from_quote( $post_id, $ref, $contact, $summary, $config, $files );
+		self::notify( $post_id, $ref, $contact, $summary, $files, $order_id );
 		return array( 'ok' => true, 'reference' => $ref );
 	}
 
 	/** Valide (taille, type réel) et range les fichiers dans un dossier privé propre à la demande. */
-	private static function store_files( $uploaded, $post_id, $ref ) {
+	public static function store_files( $uploaded, $post_id, $ref ) {
 		$saved = array();
 		if ( empty( $uploaded ) ) {
 			return $saved;
@@ -292,7 +309,7 @@ final class Sklubs_Event_Quotes {
 		return $saved;
 	}
 
-	private static function notify( $post_id, $ref, $contact, $summary, $files ) {
+	private static function notify( $post_id, $ref, $contact, $summary, $files, $order_id = 0 ) {
 		$s          = self::settings();
 		$recipients = array_filter( array_map( 'trim', preg_split( '/[\s,;]+/', (string) $s['recipients'] ) ), 'is_email' );
 		$edit       = admin_url( 'post.php?post=' . $post_id . '&action=edit' );
@@ -313,6 +330,11 @@ final class Sklubs_Event_Quotes {
 			'',
 			'Voir la demande : ' . $edit,
 		);
+		if ( $order_id ) {
+			$order   = wc_get_order( $order_id );
+			$lines[] = 'Commande WooCommerce « Devis demandé » n° ' . $order_id . ' : ' . ( $order ? $order->get_edit_order_url() : admin_url( 'post.php?post=' . $order_id . '&action=edit' ) );
+			$lines[] = 'Pour chiffrer : saisir le prix, passer « En attente de paiement », puis « Envoyer la facture au client ».';
+		}
 		$attach = array();
 		foreach ( array( 'bat', 'logo', 'logo_back', 'pass_art', 'preview' ) as $k ) {
 			if ( ! empty( $files[ $k ] ) ) {
@@ -412,6 +434,10 @@ final class Sklubs_Event_Quotes {
 			echo '<option value="' . esc_attr( $k ) . '"' . selected( $cur, $k, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select><p class="description">Enregistrez avec « Mettre à jour ».</p>';
+		$order_id = (int) get_post_meta( $post->ID, '_sk_order', true );
+		if ( $order_id && function_exists( 'wc_get_order' ) && ( $order = wc_get_order( $order_id ) ) ) {
+			echo '<p><a class="button" href="' . esc_url( $order->get_edit_order_url() ) . '">Commande WooCommerce n° ' . esc_html( $order_id ) . '</a></p>';
+		}
 	}
 
 	public static function save_status( $post_id, $post ) {
@@ -478,6 +504,24 @@ final class Sklubs_Event_Quotes {
 	public static function register_settings() {
 		register_setting(
 			'sklubs_quotes',
+			Sklubs_Event_Woo::PRICING_OPT,
+			array(
+				'sanitize_callback' => function ( $v ) {
+					$v = trim( wp_unslash( (string) $v ) );
+					if ( '' === $v ) {
+						return '';
+					}
+					$d = json_decode( $v, true );
+					if ( ! is_array( $d ) ) {
+						add_settings_error( 'sklubs_quotes', 'sk_pricing', 'Grille de prix : JSON invalide, ancienne grille conservée.' );
+						return get_option( Sklubs_Event_Woo::PRICING_OPT, '' );
+					}
+					return wp_json_encode( $d, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+				},
+			)
+		);
+		register_setting(
+			'sklubs_quotes',
 			self::OPTION,
 			array(
 				'sanitize_callback' => function ( $v ) {
@@ -509,6 +553,12 @@ final class Sklubs_Event_Quotes {
 						<td><label><input type="checkbox" name="<?php echo esc_attr( $opt ); ?>[confirm_client]" value="1" <?php checked( $s['confirm_client'], 1 ); ?>> Envoyer un e-mail de confirmation au client</label></td></tr>
 					<tr><th><label for="sk-c">Adresse du configurateur</label></th>
 						<td><input id="sk-c" class="regular-text" name="<?php echo esc_attr( $opt ); ?>[configurator]" value="<?php echo esc_attr( $s['configurator'] ); ?>"><p class="description">Utilisée par le bouton <code>[sklubs_lanyard_button]</code>.</p></td></tr>
+					<tr><th><label for="sk-p">Grille de prix (HT)</label></th>
+						<td><textarea id="sk-p" class="large-text code" rows="18" name="<?php echo esc_attr( Sklubs_Event_Woo::PRICING_OPT ); ?>"><?php echo esc_textarea( get_option( Sklubs_Event_Woo::PRICING_OPT ) ? get_option( Sklubs_Event_Woo::PRICING_OPT ) : Sklubs_Event_Woo::PRICING_TEMPLATE ); ?></textarea>
+						<p class="description">Remplacez les <code>null</code> par vos prix HT unitaires (ex. <code>0.85</code>), le MOQ et les remises (<code>[{"min": 1000, "discount": 0.1}]</code>).
+						Tant qu'un prix manque, le configurateur affiche « Sur devis » ; quand tout est rempli, il affiche le prix et le bouton « Ajouter au panier ». Le prix est recalculé ici, jamais repris du navigateur.</p></td></tr>
+					<tr><th>WooCommerce</th>
+						<td><?php echo Sklubs_Event_Woo::active() ? 'Actif : chaque devis crée une commande « Devis demandé ».' : 'Non détecté : les devis sont seulement enregistrés ici.'; ?></td></tr>
 				</table>
 				<?php submit_button(); ?>
 			</form>
@@ -527,3 +577,4 @@ final class Sklubs_Event_Quotes {
 }
 
 Sklubs_Event_Quotes::init();
+Sklubs_Event_Woo::init();

@@ -50,6 +50,7 @@ for f in sorted(os.listdir(os.path.join(ROOT, 'hardware-master', 'export'))):
         hw[f[:-4]] = base64.b64encode(open(os.path.join(ROOT, 'hardware-master', 'export', f), 'rb').read()).decode()
 head = head.replace('<link rel="stylesheet" href="styles.css">', '<style>\n' + css + '\n</style>')
 data = json.dumps(product, ensure_ascii=False).replace('</', '<\\/')
+body = body.replace('<script src="site-chrome.js"></script>', '')  # l'en-tête commun ne s'affiche pas dans un cadre d'aperçu
 body = body.replace('<script type="module" src="js/main.js"></script>',
                     f'<script>window.SKLUBS_PREVIEW = true; window.SKLUBS_PRODUCT = {data}; window.SKLUBS_HARDWARE = {json.dumps(hw)};</script>\n'
                     '  <script type="module">\n' + js.replace('</script', '<\\/script') + '\n  </script>')
