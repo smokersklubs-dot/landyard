@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SKLUBS — Configurateur Lanyard 3D</title>
+  <meta name="description" content="SKLUBS EVENT 3D : configurez votre lanyard en 3D — modèle, dimensions, matière, marquage répété, attaches, porte-badge et pass.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <header class="nav">
+    <button class="wordmark" data-go="home" aria-label="Accueil SKLUBS">SKLUBS</button>
+    <nav class="nav-links">
+      <button data-go="category">Produits</button>
+      <button data-go="config">Configurateur</button>
+      <button disabled title="Bientôt">Inspiration</button>
+      <button disabled title="Bientôt">À propos</button>
+    </nav>
+    <div class="nav-icons">
+      <button class="icon-btn plain" aria-label="Rechercher" disabled><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></button>
+      <button class="icon-btn plain" aria-label="Compte" disabled><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"/></svg></button>
+      <button class="icon-btn plain bag" id="bagBtn" aria-label="Mon projet"><svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg><i id="bagCount" hidden>0</i></button>
+      <button class="btn primary small" data-go="quote">Demander un devis</button>
+    </div>
+  </header>
+
+  <!-- 01 · Accueil -->
+  <section class="page page-home is-active" id="page-home" aria-label="Accueil">
+    <div class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">SKLUBS EVENT 3D</p>
+        <h1>YOUR<br>BRAND.<br><em>IN MOTION.</em></h1>
+        <p class="lead">Lanyards, bracelets, badges et accessoires événementiels personnalisés. Pour vos marques, événements et équipes.</p>
+        <div class="hero-cta">
+          <button class="btn primary big" data-go="category">Configurer mon lanyard <span class="arrow">→</span></button>
+          <button class="link-btn" id="resumeBtn" hidden>Reprendre mon projet enregistré</button>
+        </div>
+        <ul class="features">
+          <li><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.4 3.4 7.8 8 9 4.6-1.2 8-4.6 8-9V6l-8-3Z"/><path d="m8.5 12 2.4 2.4 4.6-4.8"/></svg><span>Qualité<br>professionnelle</span></li>
+          <li><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="17" cy="17" r="2.2"/><path d="M8 16.5 16 7.5M8.2 18h6.6"/></svg><span>Personnalisation<br>totale</span></li>
+          <li><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Faible MOQ</span></li>
+          <li><svg viewBox="0 0 24 24"><rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10h3.5l2.5 3v3h-6"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17.5" cy="17.5" r="1.6"/></svg><span>Expédition<br>internationale</span></li>
+        </ul>
+      </div>
+      <div class="hero-stage" id="heroStage">
+        <div class="hero-counter"><b id="heroIndex">01</b> / <span id="heroTotal">07</span>
+          <button class="round-btn" id="heroNext" aria-label="Modèle suivant">→</button>
+        </div>
+        <p class="hero-model" id="heroModel">Lanyard Classic</p>
+      </div>
+    </div>
+    <div class="home-cats" id="homeCats"></div>
+  </section>
+
+  <!-- 02 · Catégorie -->
+  <section class="page page-category" id="page-category" aria-label="Sélection de la catégorie">
+    <div class="page-inner">
+      <p class="crumbs"><button data-go="home">← Retour</button> <span>Configurateur</span> › <b>Choisissez votre catégorie</b></p>
+      <h2 class="page-title">Choisissez votre produit événementiel</h2>
+      <p class="page-sub">Différents produits pour différents besoins.</p>
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+  </section>
+
+  <!-- 03 → 12 · Configurateur -->
+  <section class="page page-config" id="page-config" aria-label="Configurateur">
+    <ol class="steps" id="steps" aria-label="Étapes"></ol>
+    <div class="config">
+      <div class="viewer" id="viewer">
+        <div class="viewer-loading" id="loading"><span></span>Chargement du studio 3D</div>
+        <div class="rail" id="rail" aria-label="Vignettes"></div>
+        <button class="round-btn nav-arrow left" id="prevModel" aria-label="Modèle précédent">←</button>
+        <button class="round-btn nav-arrow right" id="nextModel" aria-label="Modèle suivant">→</button>
+        <div class="tools" id="tools" role="group" aria-label="Vue 3D">
+          <button data-tool="rotate" title="Rotation 360°"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg><span>Rotation 360°</span></button>
+          <button data-tool="zoomin" title="Zoom"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2M11 8v6M8 11h6"/></svg><span>Zoom</span></button>
+          <button data-tool="zoomout" title="Dézoomer"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2M8 11h6"/></svg><span>Dézoom</span></button>
+          <button data-view="front" title="Vue avant"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4"/></svg><span>Vue avant</span></button>
+          <button data-view="back" title="Vue arrière"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg><span>Vue arrière</span></button>
+          <button data-view="top" title="Vue de dessus"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="4"/><path d="M12 4v4"/></svg><span>Vue de dessus</span></button>
+          <button data-view="detail" title="Détails"><svg viewBox="0 0 24 24"><path d="M9 4v6a3 3 0 0 0 6 0V8"/><path d="M12 13v2a4 4 0 1 1-4 4"/></svg><span>Détails</span></button>
+          <button data-tool="explode" title="Vue éclatée"><svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="5" rx="1"/><rect x="8" y="10" width="8" height="4" rx="1"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg><span>Vue éclatée</span></button>
+        </div>
+        <div class="viewer-foot">
+          <p class="spec" id="specLine"></p>
+          <p class="hint">Glisser pour tourner · Molette pour zoomer</p>
+        </div>
+      </div>
+
+      <aside class="panel" id="panel">
+        <div class="panel-head">
+          <p class="step-index" id="stepIndex">03</p>
+          <h1 class="step-title" id="stepTitle">Choix du modèle</h1>
+          <p class="step-sub" id="stepSub"></p>
+        </div>
+        <div class="panel-body" id="panelBody"></div>
+        <div class="panel-foot">
+          <div class="foot-price" id="footPrice"></div>
+          <div class="foot-actions">
+            <button class="btn ghost square" id="backBtn" aria-label="Retour">←</button>
+            <button class="btn primary" id="nextBtn">Continuer <span class="arrow">→</span></button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <div class="studio" id="studio" aria-hidden="true"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="modal" id="modal">
+    <form method="dialog">
+      <h3 id="modalTitle"></h3>
+      <div id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"><button class="btn ghost">Fermer</button></div>
+    </form>
+  </dialog>
+  <input type="file" id="logoFile" accept="image/png,image/jpeg,image/svg+xml" hidden>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+{
+  "id": "sklubs-event-lanyard",
+  "category": "event",
+  "name": "Lanyard",
+  "engine": "SKLUBS EVENT 3D",
+  "_note": "Aucun prix, MOQ ni compatibilité usine n'est inventé. Les champs null ou \"TO_DEFINE\" affichent « Validation usine requise ». Les règles ci-dessous sont un brouillon technique à valider avec le fournisseur.",
+
+  "categories": [
+    { "id": "lanyards", "name": "Lanyards", "sub": "Tours de cou", "active": true },
+    { "id": "wristbands", "name": "Bracelets", "sub": "Événementiels", "active": false },
+    { "id": "holders", "name": "Porte-badges", "sub": "Holders", "active": false },
+    { "id": "badges", "name": "Badges", "sub": "Nominatifs", "active": false },
+    { "id": "passes", "name": "Passes VIP", "sub": "Accréditations", "active": false },
+    { "id": "keystraps", "name": "Porte-clés", "sub": "Event & Brand", "active": true, "model": "wrist" }
+  ],
+
+  "models": [
+    { "id": "classic", "name": "Lanyard Classic", "tagline": "Le plus populaire. Solide, confortable et entièrement personnalisable.",
+      "pose": "neck", "profile": "flat", "materials": ["polyester", "satin", "rpet", "bamboo"], "defaultMaterial": "polyester",
+      "widths": [10, 15, 20, 25], "defaultWidth": 20, "lengths": [700, 900, 1200], "defaultLength": 900, "customLength": [400, 1400],
+      "defaultMethod": "sublimation", "usage": "Événements, entreprises, sécurité, salons" },
+    { "id": "sublimation", "name": "Lanyard Sublimation", "tagline": "Quadrichromie bord à bord : dégradés, photos, motifs continus.",
+      "pose": "neck", "profile": "flat", "materials": ["polyester", "satin", "rpet"], "defaultMaterial": "polyester",
+      "widths": [10, 15, 20, 25], "defaultWidth": 20, "lengths": [700, 900, 1200], "defaultLength": 900, "customLength": [400, 1400],
+      "defaultMethod": "sublimation", "usage": "Marques, festivals, identités fortes" },
+    { "id": "woven", "name": "Lanyard Tissé", "tagline": "Logo tissé dans la matière. Rendu premium, très durable.",
+      "pose": "neck", "profile": "flat", "materials": ["woven"], "defaultMaterial": "woven",
+      "widths": [10, 15, 20, 25], "defaultWidth": 20, "lengths": [700, 900, 1200], "defaultLength": 900, "customLength": [400, 1400],
+      "defaultMethod": "woven", "usage": "Staff, accréditations longue durée" },
+    { "id": "tubular", "name": "Lanyard Tubulaire", "tagline": "Cordon tubulaire souple, marquage sérigraphié.",
+      "pose": "neck", "profile": "tube", "materials": ["tubular"], "defaultMaterial": "tubular",
+      "widths": [8, 10, 12], "defaultWidth": 10, "lengths": [700, 900, 1200], "defaultLength": 900, "customLength": [400, 1400],
+      "defaultMethod": "screen", "usage": "Grands volumes, budgets serrés" },
+    { "id": "rpet", "name": "Lanyard RPET", "tagline": "Polyester recyclé issu de bouteilles PET.",
+      "pose": "neck", "profile": "flat", "materials": ["rpet"], "defaultMaterial": "rpet",
+      "widths": [15, 20, 25], "defaultWidth": 20, "lengths": [700, 900, 1200], "defaultLength": 900, "customLength": [400, 1400],
+      "defaultMethod": "sublimation", "usage": "Événements éco-responsables" },
+    { "id": "phone", "name": "Phone Lanyard", "tagline": "Cordon long à porter en bandoulière, avec patch téléphone.",
+      "pose": "neck", "profile": "flat", "materials": ["polyester", "rpet"], "defaultMaterial": "polyester",
+      "widths": [10, 15, 20], "defaultWidth": 15, "lengths": [1200, 1400], "defaultLength": 1200, "customLength": [900, 1600],
+      "defaultMethod": "sublimation", "defaultAttachment": "phone", "usage": "Merch, retail, festivals" },
+    { "id": "wrist", "name": "Wrist strap", "tagline": "Porte-clés court / dragonne, mêmes impressions que le lanyard.",
+      "pose": "wrist", "profile": "flat", "materials": ["polyester", "satin", "rpet", "woven"], "defaultMaterial": "polyester",
+      "widths": [10, 15, 20, 25], "defaultWidth": 20, "lengths": [250, 300, 350], "defaultLength": 300, "customLength": [150, 450],
+      "defaultMethod": "sublimation", "defaultAttachment": "keyring", "usage": "Porte-clés, goodies, retail" }
+  ],
+
+  "materials": [
+    { "id": "polyester", "name": "Polyester", "sub": "Le plus populaire", "weave": "ribs", "roughness": 0.72, "sheen": 0.35, "normal": 0.55, "thickness": 1.1 },
+    { "id": "satin", "name": "Satin", "sub": "Finition brillante", "weave": "satin", "roughness": 0.3, "sheen": 1.0, "normal": 0.25, "thickness": 1.0 },
+    { "id": "rpet", "name": "RPET", "sub": "Éco-responsable", "weave": "ribs", "roughness": 0.82, "sheen": 0.25, "normal": 0.7, "thickness": 1.2 },
+    { "id": "woven", "name": "Tissé (Woven)", "sub": "Haute durabilité", "weave": "weave", "roughness": 0.85, "sheen": 0.3, "normal": 1.0, "thickness": 1.5 },
+    { "id": "bamboo", "name": "Bambou", "sub": "Naturel", "weave": "twill", "roughness": 0.9, "sheen": 0.2, "normal": 0.8, "thickness": 1.3 },
+    { "id": "tubular", "name": "Tubulaire", "sub": "Cordon rond", "weave": "knit", "roughness": 0.85, "sheen": 0.3, "normal": 0.9, "thickness": 4.5 }
+  ],
+
+  "finishes": [
+    { "id": "matte", "name": "Mate", "roughness": 0.12 },
+    { "id": "satin", "name": "Satin", "roughness": 0 },
+    { "id": "gloss", "name": "Brillante", "roughness": -0.22 }
+  ],
+
+  "colors": [
+    { "id": "black", "name": "Noir", "hex": "#141414" },
+    { "id": "orange", "name": "Orange SKLUBS", "hex": "#FF6A00" },
+    { "id": "white", "name": "Blanc", "hex": "#F4F4F2" },
+    { "id": "silver", "name": "Gris clair", "hex": "#C9CBCC" },
+    { "id": "steel", "name": "Gris bleu", "hex": "#8C9BAA" },
+    { "id": "blue", "name": "Bleu", "hex": "#3E7FC1" },
+    { "id": "pink", "name": "Rose", "hex": "#EE7FB4" },
+    { "id": "graphite", "name": "Graphite", "hex": "#3B3D40" },
+    { "id": "sage", "name": "Vert sauge", "hex": "#7E9A7A" },
+    { "id": "olive", "name": "Olive", "hex": "#6F7A4A" },
+    { "id": "navy", "name": "Marine", "hex": "#1C2A44" },
+    { "id": "red", "name": "Rouge", "hex": "#C8102E" }
+  ],
+
+  "printingMethods": [
+    { "id": "screen", "name": "Sérigraphie", "sub": "1 à 3 couleurs", "maxColors": 3 },
+    { "id": "sublimation", "name": "Sublimation", "sub": "Quadrichromie", "maxColors": null },
+    { "id": "woven", "name": "Tissage", "sub": "Logo intégré", "maxColors": 6 }
+  ],
+
+  "breakaways": [
+    { "id": "none", "name": "Sans" },
+    { "id": "safety", "name": "Safety breakaway", "sub": "Clip de sécurité nuque" }
+  ],
+  "buckles": [
+    { "id": "none", "name": "Sans" },
+    { "id": "detachable", "name": "Boucle détachable", "sub": "Clip plastique" }
+  ],
+  "attachments": [
+    { "id": "snaphook", "name": "Mousqueton", "sub": "standard", "model": null },
+    { "id": "swivel", "name": "Crochet", "sub": "tournant", "model": null },
+    { "id": "plasticclip", "name": "Clip plastique", "sub": "J-hook", "model": null },
+    { "id": "keyring", "name": "Anneau", "sub": "porte-clés", "model": null },
+    { "id": "double", "name": "Double attache", "sub": "crochet + anneau", "model": null },
+    { "id": "phone", "name": "Patch téléphone", "sub": "universel", "model": null },
+    { "id": "none", "name": "Sans attache", "sub": "", "model": null }
+  ],
+  "hardwareColors": [
+    { "id": "chrome", "name": "Métal", "hex": "#D9DBDD", "metal": true },
+    { "id": "black", "name": "Noir", "hex": "#1A1A1A", "metal": true },
+    { "id": "white", "name": "Blanc", "hex": "#F2F2F0", "metal": false },
+    { "id": "orange", "name": "Orange", "hex": "#FF6A00", "metal": false }
+  ],
+  "holders": [
+    { "id": "none", "name": "Sans porte-badge" },
+    { "id": "pvcsoft", "name": "PVC souple", "sub": "Pochette transparente" },
+    { "id": "pvcrigid", "name": "PVC rigide", "sub": "Étui rigide" },
+    { "id": "leather", "name": "Cuir", "sub": "Biodégradable" }
+  ],
+  "card": { "widthMM": 54, "heightMM": 86, "thicknessMM": 0.76, "_note": "Format CR80" },
+
+  "rules": {
+    "methodsByMaterial": {
+      "polyester": ["sublimation", "screen"],
+      "satin": ["sublimation", "screen"],
+      "rpet": ["sublimation", "screen"],
+      "bamboo": ["screen"],
+      "woven": ["woven"],
+      "tubular": ["screen"]
+    },
+    "breakawayByProfile": { "flat": ["none", "safety"], "tube": ["none", "safety"] },
+    "attachmentsByPose": {
+      "neck": ["snaphook", "swivel", "plasticclip", "keyring", "double", "phone", "none"],
+      "wrist": ["keyring", "swivel", "snaphook", "double", "none"]
+    },
+    "holderNeedsAttachment": ["snaphook", "swivel", "plasticclip", "double"],
+    "_status": "TO_DEFINE_FACTORY"
+  },
+
+  "quantity": { "tiers": [100, 250, 500, 1000, 2500, 5000], "default": 500, "moq": null },
+
+  "pricing": {
+    "_status": "TO_DEFINE — aucun prix n'est inventé. Remplir ces champs active le calcul instantané.",
+    "currency": "EUR",
+    "priceMode": "estimated",
+    "basePriceByModel": { "classic": null, "sublimation": null, "woven": null, "tubular": null, "rpet": null, "phone": null, "wrist": null },
+    "widthSurcharge": { "8": null, "10": null, "12": null, "15": null, "20": null, "25": null },
+    "lengthSurchargePer100mm": null,
+    "materialSurcharge": { "polyester": null, "satin": null, "rpet": null, "woven": null, "bamboo": null, "tubular": null },
+    "methodSurcharge": { "screen": null, "sublimation": null, "woven": null },
+    "backPrintSurcharge": null,
+    "breakawaySurcharge": { "none": 0, "safety": null },
+    "buckleSurcharge": { "none": 0, "detachable": null },
+    "attachmentSurcharge": { "snaphook": null, "swivel": null, "plasticclip": null, "keyring": null, "double": null, "phone": null, "none": 0 },
+    "holderSurcharge": { "none": 0, "pvcsoft": null, "pvcrigid": null, "leather": null },
+    "passPrintSurcharge": null,
+    "setupFee": { "screen": null, "sublimation": null, "woven": null },
+    "quantityDiscounts": null
+  }
+}
