@@ -5,6 +5,24 @@ assemblé à partir de pièces modulaires, dans la DA blanche futuriste SKLUBS (
 
 Site statique : HTML + CSS + JavaScript (modules ES) + Three.js 0.170 chargé par CDN. Aucune étape de build.
 
+## Mise en ligne — landyard.sklubs.fr (Vercel)
+
+Site statique, aucune étape de build. Three.js est servi depuis `vendor/` (aucune dépendance CDN au runtime).
+
+1. **Vercel** : *Add New → Project*, importer le dépôt GitHub `smokersklubs-dot/landyard`.
+   Framework preset : **Other**. Build command : vide. Output directory : `.` (racine). Déployer.
+2. **Domaine** : *Project → Settings → Domains*, ajouter `landyard.sklubs.fr`.
+   Chez le gestionnaire DNS de `sklubs.fr`, créer l'enregistrement indiqué par Vercel
+   (en général `CNAME landyard → cname.vercel-dns.com`). HTTPS est automatique.
+3. **Devis par e-mail** : créer une clé sur <https://web3forms.com> avec l'adresse qui doit recevoir les devis,
+   puis la coller dans `js/config.js` (`quote.accessKey`) et pousser. Vercel redéploie tout seul.
+   Tant que la clé est vide, « Demander un devis » télécharge le dossier (JSON, aperçu PNG, BAT PDF + SVG).
+   Les pièces jointes (BAT, logo) nécessitent l'offre payante du service : mettre `attachFiles: true`.
+4. **Analytics** (facultatif) : ajouter le snippet Google Tag Manager / GA4 dans `index.html` ;
+   les événements du configurateur sont déjà poussés dans `window.dataLayer`.
+
+Chaque push sur la branche de production redéploie le site ; chaque pull request reçoit une URL d'aperçu Vercel.
+
 ## Lancer en local
 
 ```bash
@@ -47,6 +65,12 @@ ou glisser-déposer d'un fichier n'importe où sur la page. Il est appliqué au 
 | `js/viewer.js` | Scène, assemblage de la chaîne `ruban → embout/boucle → attache → porte-badge → pass`, vue éclatée, cotes, caméras, captures |
 | `js/pricing.js` | Compatibilités et calcul du prix |
 | `js/main.js` | Écrans, état, panneaux, export projet |
+| `js/hardware.js` | Chargement des pièces Blender (GLB), points d'accroche nommés, repli procédural |
+| `js/bat.js` | BAT usine : ruban à plat à l'échelle 1 (recto, verso, cotes, spécifications, couleurs, pass) en SVG et PDF |
+| `js/config.js` | Réglages de mise en ligne : clé du service de formulaire, analytics |
+| `hardware-master/` | Pièces 3D Blender (script `scripts/build_hardware.py`, `.blend`, un GLB par pièce) |
+| `vendor/three/` | Three.js 0.170 (licence MIT) servi avec le site |
+| `vercel.json` | En-têtes de cache et de sécurité pour Vercel |
 | `tools/build_preview.py` | Version autonome (un seul HTML) pour l'aperçu hébergé |
 
 Le modèle n'est **pas** un GLB par combinaison : le moteur assemble les composants.
@@ -55,6 +79,20 @@ de `attachments` dans `product.json`) et l'autoriser dans `rules.attachmentsByPo
 
 Le motif suit la courbure du textile : il est plaqué dans l'espace UV du ruban (u = longueur, v = largeur),
 une tuile par entraxe. Le mode « lisible des deux côtés » retourne le motif à mi-longueur.
+
+## Pièces 3D (Blender)
+
+`python3 hardware-master/scripts/build_hardware.py` (module `bpy` 4.2) reconstruit les pièces et les exporte :
+embout serti, boucle détachable, safety breakaway, mousqueton, crochet tournant, anneau, clip plastique.
+Chaque pièce porte des points d'accroche nommés (`STRAP_IN`, `ATTACHMENT_TOP`, `ANCHOR_BOTTOM`, `BUCKLE_SPLIT`…)
+que le moteur utilise pour assembler la chaîne. Pièces **standard du marché** : cotes à recaler sur le fournisseur.
+Le patch téléphone, les porte-badges et le pass restent générés par le code.
+
+## Logo du client
+
+Bouton de l'accueil, bouton « Ajouter mon logo » dans la vue 3D, glisser-déposer ou étape 07.
+SVG, PDF (première page), PNG ou JPG, 15 Mo max. Fond blanc retiré automatiquement (désactivable).
+Qualité d'impression estimée en dpi selon la taille réelle du logo sur le ruban : alerte en dessous de 150 dpi.
 
 ## Données à fournir (TO_DEFINE)
 
@@ -67,8 +105,8 @@ le configurateur affiche **Validation usine requise** au lieu d'un prix.
 - Compatibilités matière / méthode / attache (`rules`) : brouillon technique à valider.
 - Largeurs et longueurs réellement disponibles par modèle, épaisseurs textiles.
 - Nuancier usine et couleurs métal disponibles.
-- Point d'envoi des projets (`SUBMIT_ENDPOINT` dans `js/main.js`). En attendant, les boutons
-  de devis et de sauvegarde téléchargent le fichier projet et l'aperçu PNG.
+- Clé du service de formulaire (`js/config.js`) et adresse de réception des devis.
+- Logo officiel SKLUBS en SVG (le mot SKLUBS est actuellement composé en texte).
 
 ## Fichier projet exporté
 
@@ -79,6 +117,6 @@ Structure `LANYARD` : `TYPE`, `POSE`, `WIDTH_MM`, `LENGTH_MM`, `MATERIAL`, `BASE
 
 ## Suite prévue
 
-1. Planche technique validée du Lanyard Master et des attaches (cotes usine).
-2. Master Blender / GLB par pièce (le moteur charge déjà chaque pièce séparément).
-3. Bracelets, porte-badges, badges et passes VIP comme catégories à part entière.
+1. Cotes usine du ruban et des attaches, puis recalage des pièces Blender.
+2. Grille de prix fournisseur (`pricing` dans `product.json`).
+3. Bracelets, porte-badges, badges et passes VIP comme produits configurables (aujourd'hui en vitrine « Bientôt »).

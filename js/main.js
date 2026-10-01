@@ -1,11 +1,12 @@
 // SKLUBS EVENT 3D — parcours Lanyard (écrans 01 → 12), état, panneaux, export projet.
 import { LanyardViewer } from './viewer.js';
+import { loadHardware } from './hardware.js';
+import { buildBAT, batPDF, svgToCanvas } from './bat.js';
+import { CONFIG } from './config.js';
 import { ensureFonts, stripTexture, flatPreview, ORANGE, rasterizeLogo, hasLightBackground, removeLightBackground } from './artwork.js';
 import { sanitize, computePrice, allowedMethods, allowedAttachments, canHoldBadge, modelOf } from './pricing.js';
 
 const PRODUCT_URL = 'products/lanyard/product.json';
-// Point d'envoi des projets (API, WooCommerce, CRM). null = téléchargement local.
-const SUBMIT_ENDPOINT = null;
 const STORE_KEY = 'sklubs-lanyard-v1';
 const PROJECT_KEY = 'sklubs-event-project';
 
@@ -34,6 +35,7 @@ let product, state, viewer, hero, studio;
 let step = 0;
 const modelThumbs = {};
 const catThumbs = {};
+const catBig = {};
 let heroCat = 0;
 
 function defaultState(modelId = 'classic') {
@@ -50,7 +52,7 @@ function defaultState(modelId = 'classic') {
     kit: 'pass', holder: 'pvcsoft', holderOrientation: 'vertical',
     pass: { event: 'SKLUBS', name: 'Prénom Nom', role: 'VIP', date: '12 — 14 JUIN 2026', accent: ORANGE, bg: '#121212' },
     quantity: product.quantity.default, logoVersion: 0,
-    ui: { dims: false, explode: false, editSide: 'front', persoTab: 'logo', guides: false },
+    ui: { dims: false, explode: false, editSide: 'front', persoTab: 'logo', badgeTab: 'holder', guides: false },
   };
   return sanitize(product, s);
 }
@@ -60,7 +62,9 @@ async function init() {
   product = window.SKLUBS_PRODUCT || await (await fetch(PRODUCT_URL)).json();
   await ensureFonts();
   state = defaultState();
+  track('event_configurator_started');
   bindGlobal();
+  bindSheet();
   renderCategories();
   renderSteps();
 
@@ -68,16 +72,20 @@ async function init() {
   showHero(0);
 
   viewer = new LanyardViewer($('#viewer'), { mode: 'config' });
+  setSheet($('#panel').dataset.sheet || 'half');
+  window.addEventListener('resize', () => setSheet($('#panel').dataset.sheet));
   viewer.apply(state, product);
-  viewer.setView('front', true);
+  viewer.setView('showcase', true);
   $('#loading').classList.add('hidden');
 
   studio = new LanyardViewer($('#studio'), { mode: 'studio', width: 360, height: 460 });
   if (store.get(STORE_KEY)) $('#resumeBtn').hidden = false;
+  // Pièces Blender : chargées en parallèle, la 3D s'affiche déjà avec les pièces procédurales.
+  const hardware = loadHardware().then((lib) => { for (const v of [hero, viewer, studio]) v.setHardware(lib); return lib; });
   updateBag();
   const hash = location.hash.replace('#', '');
   if (hash === 'config') go('config');
-  requestIdle(renderModelThumbs);
+  hardware.finally(() => requestIdle(renderModelThumbs));
 }
 const requestIdle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 800 }) : setTimeout(fn, 200));
 
@@ -104,6 +112,12 @@ function renderModelThumbs() {
   for (const c of product.categories) {
     studio.apply(showcaseState(c.id), product);
     catThumbs[c.id] = studio.snapshot(['holders', 'badges', 'passes'].includes(c.id) ? 'front' : 'threeq');
+  }
+  // Page Catégorie : rendus portrait, le produit occupe la carte.
+  studio.setSize(300, 380);
+  for (const c of product.categories) {
+    studio.apply(showcaseState(c.id), product);
+    catBig[c.id] = studio.snapshot(['holders', 'badges', 'passes'].includes(c.id) ? 'front' : c.id === 'wristbands' ? 'threeq' : 'showcase');
   }
   studio.setSize(360, 460);
   renderCategories();
@@ -134,13 +148,14 @@ function setStep(i, force = false) {
   $('#stepTitle').textContent = s.title;
   $('#stepSub').textContent = s.sub || '';
   $('#page-config').dataset.step = s.id;
+  if (prev !== step || force) track('configurator_step', { step: s.id });
   renderSteps();
   renderPanel();
   if (prev !== step || force) $('#panelBody').scrollTop = 0;
   renderRail();
   refresh();
   if (prev !== step || force) {
-    const view = { dims: 'front', attach: 'detail', badge: 'front', material: 'macro', perso: 'macro', print: 'front', final: 'front' }[s.id];
+    const view = { model: 'showcase', view: 'front', dims: 'front', attach: 'detail', badge: 'front', material: 'macro', perso: 'macro', print: 'showcase', qty: 'showcase', final: 'showcase' }[s.id];
     if (view) viewer.setView(view); else if (force) viewer.setView('front');
   }
   $('#backBtn').title = step === 0 ? 'Catégories' : 'Étape précédente';
@@ -210,15 +225,15 @@ function renderPanel() {
   const m = modelOf(product, state.model);
   let html = '';
   if (id === 'model') {
-    html = `<div class="model-list">${product.models.map((x) => `<button class="model-card ${x.id === state.model ? 'is-on' : ''}" data-model="${x.id}">
-        <span class="thumb">${modelThumbs[x.id] ? `<img src="${modelThumbs[x.id]}" alt="">` : ''}</span>
-        <span><b>${x.name}</b><small>${x.tagline}</small></span></button>`).join('')}</div>` +
-      `<div class="spec-card"><h3>${m.name}</h3><p>${m.tagline}</p><dl>
-        <div><dt>Matière</dt><dd>${m.materials.map((id) => product.materials.find((x) => x.id === id).name).join(' / ')}</dd></div>
-        <div><dt>Largeur</dt><dd>${m.widths.join(' / ')} mm</dd></div>
-        <div><dt>Longueur</dt><dd>${m.lengths.map((l) => l / 10).join(' / ')} cm ou sur mesure</dd></div>
-        <div><dt>Impression</dt><dd>${[...new Set(m.materials.flatMap((id) => product.rules.methodsByMaterial[id]))].map((id) => product.printingMethods.find((x) => x.id === id).name).join(', ')}</dd></div>
-        <div><dt>Utilisation</dt><dd>${m.usage}</dd></div></dl></div>`;
+    const ic = (d) => `<i class="si"><svg viewBox="0 0 24 24">${d}</svg></i>`;
+    const methods = [...new Set(m.materials.flatMap((x) => product.rules.methodsByMaterial[x]))].map((x) => product.printingMethods.find((y) => y.id === x).name).join(', ');
+    html = `<div class="spec-card big"><h3>${m.name}</h3><p>${m.tagline}</p><dl>
+        <div>${ic('<path d="M4 7h16M4 12h16M4 17h16"/>')}<span><dt>Matière</dt><dd>${m.materials.map((x) => product.materials.find((y) => y.id === x).name).join(' / ')}</dd></span></div>
+        <div>${ic('<path d="M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3"/>')}<span><dt>Largeur</dt><dd>${m.widths.join(' / ')} mm</dd></span></div>
+        <div>${ic('<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>')}<span><dt>Longueur</dt><dd>${m.lengths.map((l) => l / 10).join(' / ')} cm ou sur mesure</dd></span></div>
+        <div>${ic('<path d="M5 19 19 5M8 5h11v11"/>')}<span><dt>Personnalisation</dt><dd>${methods}</dd></span></div>
+        <div>${ic('<circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"/>')}<span><dt>Utilisation</dt><dd>${m.usage}</dd></span></div></dl></div>
+      <p class="note">${product.models.length} modèles : utilisez les vignettes à gauche ou les flèches pour comparer.</p>`;
   }
   if (id === 'view') {
     html = group('Explorer', `<div class="tool-grid">
@@ -252,9 +267,9 @@ function renderPanel() {
     if (tab === 'logo') {
       html += `<div class="drop ${s.logoName ? 'has-logo' : ''}" id="dropZone">
           <button class="import" id="importLogo"><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg></span>
-            <span><b>${s.logoName ? 'Remplacer le logo' : 'Importer un logo'}</b><small>PNG, JPG ou SVG · ou glissez-déposez ici</small></span></button>
+            <span><b>${s.logoName ? 'Remplacer le logo' : 'Importer un logo'}</b><small>SVG, PDF, PNG ou JPG · ou glissez-déposez ici</small></span></button>
           ${s.logoName ? `<div class="logo-card"><span class="logo-prev" style="--bg:${state.color}"><img id="logoPrev" alt="Votre logo"></span>
-            <span class="meta"><b>${esc(s.logoName)}</b><small>Appliqué sur le ${k === 'back' ? 'verso' : state.backMode === 'same' ? 'recto et le verso' : 'recto'}${state.kit === 'pass' ? ' et sur le pass' : ''}</small></span>
+            <span class="meta"><b>${esc(s.logoName)}</b>${(() => { const q = logoQuality(s); return q ? `<em class="q q-${q.level}">Qualité d'impression : ${q.label}</em>` : ''; })()}<small>Appliqué sur le ${k === 'back' ? 'verso' : state.backMode === 'same' ? 'recto et le verso' : 'recto'}${state.kit === 'pass' ? ' et sur le pass' : ''}</small></span>
             <button class="link-btn" id="removeLogo">Retirer</button></div>
             ${toggle(k + '.logoBgRemoved', !!s.logoBgRemoved, 'Retirer le fond blanc', 'Garde uniquement le dessin du logo')}` : ''}
         </div>
@@ -315,15 +330,27 @@ function renderPanel() {
         ${m.pose === 'neck' ? '<button class="btn ghost" data-k="attachment" data-v="snaphook">Passer au mousqueton standard</button>' : ''}</div>`;
     } else {
       html = group('Complete your event kit', `<div class="list">${[['lanyard', 'Lanyard seul', 'Le cordon et son attache'], ['holder', 'Lanyard + porte-badge', 'Pochette ou étui'], ['pass', 'Lanyard + porte-badge + pass imprimé', 'Le kit complet, prêt à distribuer']].map(([v, t, sub]) => `<button class="row radio ${state.kit === v ? 'is-on' : ''}" data-k="kit" data-v="${v}"><i></i><span><b>${t}</b><small>${sub}</small></span></button>`).join('')}</div>`);
-      if (state.kit !== 'lanyard') {
+      const tabs = state.kit === 'pass' ? [['holder', 'Porte-badge'], ['badge', 'Badge nominatif'], ['pass', 'Pass VIP']] : state.kit === 'holder' ? [['holder', 'Porte-badge']] : [];
+      const bt = tabs.some(([v]) => v === state.ui.badgeTab) ? state.ui.badgeTab : 'holder';
+      if (tabs.length > 1) html += `<div class="tabs" role="tablist">${tabs.map(([v, t]) => `<button role="tab" aria-selected="${v === bt}" class="${v === bt ? 'is-on' : ''}" data-k="ui.badgeTab" data-v="${v}">${t}</button>`).join('')}</div>`;
+      if (state.kit !== 'lanyard' && bt === 'holder') {
         html += group('Type de porte-badge', `<div class="cards3">${product.holders.filter((h) => h.id !== 'none').map((h) => `<button class="card ${h.id === state.holder ? 'is-on' : ''}" data-k="holder" data-v="${h.id}"><b>${h.name}</b><small>${h.sub}</small></button>`).join('')}</div>`) +
           group('Format', `<div class="chips">${chip('holderOrientation', 'vertical', 'Vertical', state.holderOrientation)}${chip('holderOrientation', 'horizontal', 'Horizontal', state.holderOrientation)}</div>`, 'Carte CR80 · 54 × 86 mm');
       }
-      if (state.kit === 'pass') {
-        html += group('Pass personnalisé', `<div class="field"><label>Événement</label><input type="text" data-k="pass.event" value="${esc(state.pass.event)}" maxlength="18"></div>
-          <div class="field"><label>Nom du porteur</label><input type="text" data-k="pass.name" value="${esc(state.pass.name)}" maxlength="26"></div>
-          <div class="field two"><div><label>Accès</label><input type="text" data-k="pass.role" value="${esc(state.pass.role)}" maxlength="16"></div><div><label>Dates</label><input type="text" data-k="pass.date" value="${esc(state.pass.date)}" maxlength="24"></div></div>
-          <div class="field"><label>Couleur d'accent</label>${swatches('pass.accent', product.colors, state.pass.accent)}</div>`, 'Le logo du lanyard est repris');
+      if (state.kit === 'pass' && bt === 'badge') {
+        const n = (state.pass.names || '').split('\n').map((x) => x.trim()).filter(Boolean).length;
+        html += group('Badge nominatif', `<div class="field"><label for="pName">Nom affiché sur l'aperçu</label><input id="pName" type="text" data-k="pass.name" value="${esc(state.pass.name)}" maxlength="26"></div>
+          <div class="field"><label for="pRole">Accès / fonction</label><input id="pRole" type="text" data-k="pass.role" value="${esc(state.pass.role)}" maxlength="16"></div>
+          <div class="field"><label for="pNames">Liste des noms (un par ligne)</label><textarea id="pNames" class="names" data-k="pass.names" rows="5" placeholder="Prénom Nom — Fonction">${esc(state.pass.names || '')}</textarea></div>
+          <p class="note">${n ? `${n} badge${n > 1 ? 's' : ''} nominatif${n > 1 ? 's' : ''} : la liste est jointe au devis.` : 'Sans liste, tous les pass portent le même texte.'}</p>`);
+      }
+      if (state.kit === 'pass' && bt === 'pass') {
+        html += group('Pass VIP', `<div class="field"><label for="pEvent">Événement</label><input id="pEvent" type="text" data-k="pass.event" value="${esc(state.pass.event)}" maxlength="18"></div>
+          <div class="field"><label for="pDate">Dates</label><input id="pDate" type="text" data-k="pass.date" value="${esc(state.pass.date)}" maxlength="24"></div>
+          <div class="upload"><button class="btn ghost" id="importPassArt">${state.passArt ? 'Remplacer le visuel du pass' : 'Importer un visuel pour le pass'}</button>
+            <span class="file">${state.passArt ? esc(state.passArt.logoName) + ' <button class="link-btn" id="removePassArt">Retirer</button>' : 'Par défaut : le logo du lanyard'}</span></div>
+          <div class="field"><label>Couleur d'accent</label>${swatches('pass.accent', product.colors, state.pass.accent)}</div>
+          <div class="field"><label>Fond du pass</label>${swatches('pass.bg', product.colors, state.pass.bg)}</div>`, 'Carte CR80 imprimée');
       }
     }
   }
@@ -334,6 +361,7 @@ function renderPanel() {
       }).join('')}</tbody></table>
       <div class="field inline"><label>Quantité libre</label><input type="number" id="qtyInput" min="1" step="1" value="${state.quantity}"></div>
       <div class="price-big" id="priceBig"></div>
+      <button class="btn primary wide" id="addProject">Ajouter au projet <span class="arrow">→</span></button>
       <p class="note">Prix estimatifs, validation usine incluse. ${computePrice(product, state).status === 'factory' ? 'Tarifs fournisseur non renseignés : chaque projet est validé et chiffré par l\'usine.' : ''}</p>`;
   }
   if (id === 'final') {
@@ -342,6 +370,7 @@ function renderPanel() {
         <button class="btn primary" id="addProject">Ajouter au projet <span class="arrow">→</span></button>
         <button class="btn outline" id="quoteBtn">Demander un devis</button>
         <button class="btn outline" id="saveBtn">Sauvegarder mon projet</button>
+        <div class="bat-row"><button class="link-btn" id="batView">Voir le BAT</button><button class="link-btn" id="batBtn">Télécharger le BAT (PDF + SVG)</button></div>
       </div>`;
   }
   $('#panelBody').innerHTML = html;
@@ -372,31 +401,81 @@ function afterPerso() {
 }
 
 // Import d'un logo (bouton, glisser-déposer, raccourcis) : rastérisé, fond blanc retiré si détecté.
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = PDFJS + 'pdf.min.js';
+    sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; resolve(window.pdfjsLib); };
+    sc.onerror = () => reject(new Error('pdf.js indisponible'));
+    document.head.appendChild(sc);
+  });
+}
+
+// PDF (logo vectoriel) : première page rendue en haute définition.
+async function pdfToCanvas(file) {
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const page = await doc.getPage(1);
+  const v0 = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: 2048 / Math.max(v0.width, v0.height) });
+  const c = document.createElement('canvas');
+  c.width = Math.round(viewport.width); c.height = Math.round(viewport.height);
+  await page.render({ canvasContext: c.getContext('2d'), viewport, background: 'rgba(0,0,0,0)' }).promise;
+  return c;
+}
+
+function applyLogo(raster, name, dataUrl, vector, goPerso) {
+  const s = state[sideKey()];
+  const light = hasLightBackground(raster);
+  s.logoSrc = raster; s.logoBgRemoved = light;
+  s.logoImage = light ? removeLightBackground(raster) : raster;
+  // Le texte d'exemple « SKLUBS » laisse la place au logo du client.
+  if (!s.logoName && s.text === 'SKLUBS') { s.textOn = false; s.scale = Math.max(s.scale, 72); }
+  s.logoName = name; s.logoData = dataUrl; s.logoOn = true; s.logoVector = vector;
+  state.logoVersion++;
+  if (goPerso || currentPage !== 'config' || STEPS[step].id !== 'perso') { state.ui.persoTab = 'logo'; step = STEPS.findIndex((x) => x.id === 'perso'); go('config'); }
+  else { refresh(); renderPanel(); viewer.setView('macro'); }
+  $('#logoCta').hidden = true;
+  const q = logoQuality(s);
+  track('artwork_uploaded', { vector, background_removed: light, quality: q.level });
+  toast(q.level === 'low' ? `Logo importé, mais sa résolution est faible (${q.dpi} dpi) : envoyez un SVG ou une image plus grande pour une impression nette.`
+    : light ? 'Logo importé, fond blanc retiré. Il se répète sur le ruban.' : 'Logo importé : il se répète sur le ruban.');
+}
+
 function loadLogoFile(f, { goPerso = false } = {}) {
   if (!f) return;
-  if (!/^image\/(png|jpe?g|svg\+xml)$/.test(f.type)) { toast('Format non pris en charge. Utilisez un PNG, JPG ou SVG.'); return; }
+  const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+  if (!isPdf && !/^image\/(png|jpe?g|svg\+xml)$/.test(f.type)) { toast('Format non pris en charge. Utilisez un SVG, PDF, PNG ou JPG.'); return; }
+  if (f.size > 15 * 1024 * 1024) { toast('Fichier trop lourd (15 Mo maximum).'); return; }
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
+    if (isPdf) {
+      try { applyLogo(await pdfToCanvas(f), f.name, reader.result, true, goPerso); }
+      catch { toast('PDF illisible. Essayez un SVG ou un PNG.'); }
+      return;
+    }
     const img = new Image();
-    img.onload = () => {
-      const s = state[sideKey()];
-      const raster = rasterizeLogo(img);
-      const light = hasLightBackground(raster);
-      s.logoSrc = raster; s.logoBgRemoved = light;
-      s.logoImage = light ? removeLightBackground(raster) : raster;
-      // Le texte d'exemple « SKLUBS » laisse la place au logo du client.
-      if (!s.logoName && s.text === 'SKLUBS') { s.textOn = false; s.scale = Math.max(s.scale, 72); }
-      s.logoName = f.name; s.logoData = reader.result; s.logoOn = true;
-      state.logoVersion++;
-      if (goPerso || currentPage !== 'config') { state.ui.persoTab = 'logo'; step = STEPS.findIndex((x) => x.id === 'perso'); go('config'); }
-      else { refresh(); renderPanel(); viewer.setView('macro'); }
-      $('#logoCta').hidden = true;
-      toast(light ? 'Logo importé, fond blanc retiré. Il se répète sur le ruban.' : 'Logo importé : il se répète sur le ruban.');
-    };
-    img.onerror = () => toast('Image illisible. Utilisez un PNG, JPG ou SVG.');
+    const vector = f.type === 'image/svg+xml';
+    img.onload = () => applyLogo(rasterizeLogo(img, vector ? 2048 : 1600), f.name, reader.result, vector, goPerso);
+    img.onerror = () => toast('Image illisible. Utilisez un SVG, PDF, PNG ou JPG.');
     img.src = reader.result;
   };
   reader.readAsDataURL(f);
+}
+
+// Qualité d'impression : pixels du logo / hauteur imprimée.
+function logoQuality(s = state[sideKey()]) {
+  if (!s.logoImage) return null;
+  if (s.logoVector) return { level: 'vector', dpi: null, label: 'Vectoriel : impression nette à toutes les tailles' };
+  const across = s.rotation === 90 || s.rotation === 270;
+  const mm = state.width * (s.scale / 100) * 0.86;
+  const px = across ? s.logoImage.width : s.logoImage.height;
+  const dpi = Math.round(px / (mm / 25.4));
+  if (dpi >= 300) return { level: 'good', dpi, label: `Excellente (${dpi} dpi)` };
+  if (dpi >= 150) return { level: 'ok', dpi, label: `Suffisante (${dpi} dpi)` };
+  return { level: 'low', dpi, label: `Faible (${dpi} dpi) : risque de flou, fournissez un SVG, un PDF ou une image plus grande` };
 }
 
 function bigPrice() {
@@ -486,7 +565,7 @@ function renderCategories() {
     passes: '<svg viewBox="0 0 48 48"><rect x="14" y="8" width="20" height="32" rx="3"/><path d="M19 30h10M21 13h6"/></svg>',
   };
   const card = (c, big) => `<button class="cat ${c.active ? '' : 'soon'} ${big ? 'big' : ''} ${!big && product.categories[heroCat]?.id === c.id ? 'is-on' : ''}" data-cat="${c.id}" ${c.active ? '' : 'aria-disabled="true"'}>
-      <span class="thumb">${catThumbs[c.id] ? `<img src="${catThumbs[c.id]}" alt="">` : svg[c.id] || ''}</span>
+      <span class="thumb">${(big ? catBig : catThumbs)[c.id] ? `<img src="${(big ? catBig : catThumbs)[c.id]}" alt="">` : svg[c.id] || ''}</span>
       <b>${c.name}</b>${big ? `<small>${c.active ? c.sub : 'Bientôt'}</small>` : ''}</button>`;
   $('#catGrid').innerHTML = product.categories.map((c) => card(c, true)).join('');
   $('#homeCats').innerHTML = product.categories.map((c) => card(c, false)).join('');
@@ -495,7 +574,7 @@ function renderCategories() {
 // ---------- Projet ----------
 function serializable() {
   const strip = (s) => { const { logoImage, logoSrc, ...r } = s; return r; };
-  return { ...state, front: strip(state.front), back: strip(state.back), ui: undefined };
+  return { ...state, front: strip(state.front), back: strip(state.back), passArt: undefined, ui: undefined };
 }
 
 function buildProject(withImage = true) {
@@ -526,8 +605,7 @@ function download(name, data, type) {
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
 
-function exportProject() {
-  const proj = buildProject();
+function exportProject(proj = buildProject()) {
   if (window.SKLUBS_PREVIEW) {
     const { preview_image, logo_files, ...light } = proj;
     modal('Fichier projet', `<p class="note">Les téléchargements sont bloqués dans cet aperçu. Voici le fichier projet (JSON) :</p><pre class="json">${esc(JSON.stringify(light, null, 2))}</pre>`,
@@ -540,16 +618,102 @@ function exportProject() {
   download(`sklubs-lanyard-${stamp}.png`, proj.preview_image);
 }
 
-async function submitQuote() {
-  if (!SUBMIT_ENDPOINT) {
-    exportProject();
-    if (!window.SKLUBS_PREVIEW) toast("Envoi en ligne à brancher (point d'envoi SKLUBS à définir). Projet et aperçu téléchargés.");
+// ---------- BAT ----------
+const projectRef = () => (state.ref ||= 'SK-' + Date.now().toString(36).toUpperCase());
+function makeBAT() {
+  return buildBAT({ state, product, drop: viewer.strap.drop, preview: viewer.snapshot(), ref: projectRef() });
+}
+
+async function downloadBAT() {
+  const bat = makeBAT();
+  if (window.SKLUBS_PREVIEW) return showBAT(bat);
+  toast('Préparation du BAT…');
+  download(`BAT-${projectRef()}.svg`, bat.svg, 'image/svg+xml');
+  try { download(`BAT-${projectRef()}.pdf`, await batPDF(bat), 'application/pdf'); toast('BAT téléchargé (PDF + SVG).'); }
+  catch { toast('BAT SVG téléchargé. Le PDF nécessite une connexion.'); }
+  track('bat_downloaded');
+}
+
+async function showBAT(bat = makeBAT()) {
+  modal('Bon à tirer (BAT)', '<p class="note">Ruban à plat à l\'échelle 1, recto / verso, cotes et spécifications.</p><div class="bat-view" id="batView">Préparation…</div>');
+  const c = await svgToCanvas(bat.svg, bat.width, bat.height, 4);
+  const img = new Image(); img.src = c.toDataURL('image/png'); img.alt = 'BAT du lanyard';
+  $('#batView').replaceChildren(img);
+}
+
+// ---------- Devis ----------
+function openQuote() {
+  const f = store.get('sklubs-contact') || {};
+  modal('Demander un devis', `<div class="quote" id="quoteForm">
+      <p class="note">Votre configuration, le BAT et votre logo sont joints à la demande. Réponse de l'équipe SKLUBS avec le prix usine.</p>
+      <div class="field two"><div><label for="qName">Nom *</label><input id="qName" name="name" type="text" required value="${esc(f.name)}" autocomplete="name"></div>
+        <div><label for="qCompany">Société</label><input id="qCompany" name="company" type="text" value="${esc(f.company)}" autocomplete="organization"></div></div>
+      <div class="field two"><div><label for="qEmail">E-mail *</label><input id="qEmail" name="email" type="email" required value="${esc(f.email)}" autocomplete="email"></div>
+        <div><label for="qPhone">Téléphone</label><input id="qPhone" name="phone" type="tel" value="${esc(f.phone)}" autocomplete="tel"></div></div>
+      <div class="field two"><div><label for="qDate">Date de l'événement</label><input id="qDate" name="eventDate" type="date" value="${esc(f.eventDate)}"></div>
+        <div><label for="qQty">Quantité</label><input id="qQty" name="quantity" type="number" min="1" value="${state.quantity}"></div></div>
+      <div class="field"><label for="qMsg">Message</label><textarea id="qMsg" name="message" rows="3" placeholder="Délais, livraison, questions…">${esc(f.message)}</textarea></div>
+      <p class="form-error" id="qError" hidden></p>
+    </div>`, '<button class="btn primary" id="sendQuote" value="send">Envoyer la demande <span class="arrow">→</span></button>');
+  $('#sendQuote').onclick = (e) => { e.preventDefault(); sendQuote(); };
+  track('quote_form_opened');
+}
+
+function quoteSummary(contact, proj) {
+  const lines = recap().map(([a, b]) => `${a} : ${b}`);
+  return [`Demande de devis ${proj.reference}`, '', `Nom : ${contact.name}`, `Société : ${contact.company || '—'}`, `E-mail : ${contact.email}`,
+    `Téléphone : ${contact.phone || '—'}`, `Date de l'événement : ${contact.eventDate || '—'}`, '', ...lines, '', `Message : ${contact.message || '—'}`].join('\n');
+}
+
+async function sendQuote() {
+  const form = $('#quoteForm');
+  const data = Object.fromEntries([...form.querySelectorAll('[name]')].map((i) => [i.name, i.value.trim()]));
+  const err = $('#qError');
+  if (!data.name?.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email || '')) {
+    err.textContent = 'Indiquez votre nom et une adresse e-mail valide.'; err.hidden = false; return;
+  }
+  state.quantity = Math.max(1, Math.round(Number(data.quantity) || state.quantity));
+  store.set('sklubs-contact', { ...data, quantity: undefined });
+  const proj = { ...buildProject(), reference: projectRef(), contact: data };
+  const q = CONFIG.quote;
+  const btn = $('#sendQuote');
+  if (!q.accessKey || window.SKLUBS_PREVIEW) {
+    $('#modal').close();
+    exportProject(proj);
+    if (!window.SKLUBS_PREVIEW) { downloadBAT(); toast("Envoi en ligne pas encore activé : votre dossier est téléchargé, envoyez-le à l'équipe SKLUBS."); }
+    track('quote_requested', { mode: 'download' });
     return;
   }
+  btn.disabled = true; btn.textContent = 'Envoi…';
   try {
-    const res = await fetch(SUBMIT_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildProject()) });
-    toast(res.ok ? 'Demande de devis envoyée.' : "L'envoi a échoué, réessayez.");
-  } catch { toast("L'envoi a échoué, réessayez."); }
+    const { preview_image, logo_files, ...light } = proj;
+    const fd = new FormData();
+    if (q.provider === 'web3forms') { fd.append('access_key', q.accessKey); fd.append('from_name', 'Configurateur SKLUBS'); }
+    fd.append('subject', `${q.subject} — ${data.company || data.name} (${proj.reference})`);
+    fd.append('name', data.name); fd.append('email', data.email);
+    fd.append('message', quoteSummary(data, proj));
+    fd.append('configuration_json', JSON.stringify(light, null, 2));
+    if (q.attachFiles) {
+      const bat = makeBAT();
+      fd.append('attachment', await batPDF(bat), `BAT-${proj.reference}.pdf`);
+      fd.append('attachment_preview', await (await fetch(preview_image)).blob(), `apercu-${proj.reference}.png`);
+      for (const l of logo_files) if (l.data_url) fd.append('attachment_logo', await (await fetch(l.data_url)).blob(), l.name);
+    }
+    const res = await fetch(q.endpoint, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(res.status);
+    $('#modal').close();
+    toast(`Demande ${proj.reference} envoyée. L'équipe SKLUBS vous répond par e-mail.`);
+    track('quote_requested', { mode: 'email', reference: proj.reference });
+  } catch {
+    btn.disabled = false; btn.innerHTML = 'Envoyer la demande <span class="arrow">→</span>';
+    err.textContent = "L'envoi a échoué. Vérifiez votre connexion et réessayez."; err.hidden = false;
+  }
+}
+
+// ---------- Analytics ----------
+function track(event, params = {}) {
+  if (!CONFIG.analytics) return;
+  (window.dataLayer ||= []).push({ event, product: 'lanyard', model: state?.model, ...params });
 }
 
 function updateBag() {
@@ -576,12 +740,14 @@ function modal(title, body, actions = '') {
 }
 
 function selectModel(id) {
+  track('lanyard_model_selected', { model_id: id });
   const keep = { color: state.color, front: state.front, back: state.back, backMode: state.backMode, pass: state.pass, quantity: state.quantity, hardwareColor: state.hardwareColor, hardwareHex: state.hardwareHex, logoVersion: state.logoVersion, ui: state.ui };
   state = sanitize(product, { ...defaultState(id), ...keep });
   refresh();
   renderPanel();
   renderRail();
-  viewer.setView('front');
+  viewer.transition();
+  viewer.setView(STEPS[step].id === 'model' ? 'showcase' : 'front');
 }
 
 function parseVal(el, raw) {
@@ -598,6 +764,7 @@ function bindGlobal() {
     if (t.dataset.go) { go(t.dataset.go); return; }
     if (t.dataset.cat) {
       const c = product.categories.find((x) => x.id === t.dataset.cat);
+      track('event_category_selected', { category: c.id });
       if (!c.active) { toast(`${c.name} : bientôt disponible dans SKLUBS EVENT 3D.`); return; }
       step = 0; go('config'); selectModel(c.model || state.model); return;
     }
@@ -621,6 +788,8 @@ function bindGlobal() {
       refresh(); renderPanel(); $('#dropOut') && ($('#dropOut').textContent = Math.round(viewer.strap.drop / 10) + ' cm'); return;
     }
     if (t.dataset.k && t.dataset.v !== undefined) {
+      const ev = { width: 'lanyard_width_selected', length: 'lanyard_length_selected', material: 'lanyard_material_selected', color: 'lanyard_color_selected', method: 'print_method_selected', attachment: 'attachment_selected', holder: 'holder_selected', kit: 'kit_selected', backMode: 'print_sides_selected' }[t.dataset.k];
+      if (ev) track(ev, { value: t.dataset.v });
       if (t.dataset.k === 'hardwareColor') state.hardwareColor = t.dataset.v;
       else setPath(t.dataset.k, parseVal(t, t.dataset.v));
       if (t.dataset.k === 'attachment' && STEPS[step].id === 'attach') viewer.setView('detail');
@@ -631,7 +800,7 @@ function bindGlobal() {
       const items = store.get(PROJECT_KEY) || []; items.splice(Number(t.dataset.remove), 1); store.set(PROJECT_KEY, items); updateBag(); showProject(); return;
     }
     switch (t.id) {
-      case 'nextBtn': if (step === STEPS.length - 1) submitQuote(); else setStep(step + 1); break;
+      case 'nextBtn': if (step === STEPS.length - 1) openQuote(); else setStep(step + 1); break;
       case 'backBtn': if (step === 0) go('category'); else setStep(step - 1); break;
       case 'prevModel': case 'nextModel': {
         const ids = product.models.map((m) => m.id), i = ids.indexOf(state.model);
@@ -639,15 +808,19 @@ function bindGlobal() {
       }
       case 'heroNext': showHero(heroCat + 1); break;
       case 'importLogo': $('#logoFile').click(); break;
+      case 'importPassArt': $('#passFile').click(); break;
+      case 'removePassArt': state.passArt = null; state.logoVersion++; refresh(); renderPanel(); break;
       case 'logoCta': case 'heroLogo': logoIntent = true; $('#logoFile').click(); break;
       case 'removeLogo': { const s = state[sideKey()]; s.logoImage = null; s.logoSrc = null; s.logoName = null; s.logoData = null; s.logoTint = ''; state.logoVersion++; refresh(); renderPanel(); $('#logoCta').hidden = STEPS[step].id === 'perso'; break; }
       case 'addProject': {
         const items = store.get(PROJECT_KEY) || [];
         items.push({ title: modelOf(product, state.model).name, spec: `${state.width} mm × ${state.length / 10} cm · ${state.quantity} pcs`, thumb: viewer.snapshot(), config: serializable() });
         if (!store.set(PROJECT_KEY, items)) { items.at(-1).thumb = ''; store.set(PROJECT_KEY, items); }
-        updateBag(); toast('Ajouté à votre projet.'); break;
+        updateBag(); toast('Ajouté à votre projet.'); track('project_added'); break;
       }
-      case 'quoteBtn': submitQuote(); break;
+      case 'quoteBtn': openQuote(); break;
+      case 'batBtn': downloadBAT(); break;
+      case 'batView': showBAT(); break;
       case 'saveBtn': store.set(STORE_KEY, serializable()); exportProject(); if (!window.SKLUBS_PREVIEW) toast('Projet enregistré sur cet appareil et téléchargé.'); break;
       case 'bagBtn': showProject(); break;
       case 'resumeBtn': {
@@ -685,6 +858,13 @@ function bindGlobal() {
   document.addEventListener('input', onInput);
   document.addEventListener('change', (e) => { if (e.target.type === 'checkbox' || e.target.type === 'color' || e.target.id === 'hwCustom') onInput(e); });
 
+  $('#passFile').addEventListener('change', (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f || !/^image\/(png|jpe?g|svg\+xml)$/.test(f.type)) { if (f) toast('Utilisez un SVG, PNG ou JPG pour le pass.'); return; }
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => { const c = rasterizeLogo(img, 1200); state.passArt = { logoImage: hasLightBackground(c) ? removeLightBackground(c) : c, logoName: f.name, logoData: r.result }; state.logoVersion++; refresh(); renderPanel(); toast('Visuel du pass importé.'); }; img.src = r.result; };
+    r.readAsDataURL(f);
+  });
   $('#logoFile').addEventListener('change', (e) => { loadLogoFile(e.target.files[0], { goPerso: logoIntent }); logoIntent = false; e.target.value = ''; });
 
   // Glisser-déposer un logo n'importe où sur la page
@@ -701,8 +881,46 @@ function bindGlobal() {
 }
 let logoIntent = false;
 
-init().catch((err) => {
-  console.error(err);
-  const l = document.getElementById('loading');
-  if (l) l.textContent = 'Impossible de charger le configurateur. Lancez-le via un serveur HTTP.';
-});
+// ---------- Mobile : panneau en bottom sheet (réduit, moitié, plein écran) ----------
+const SHEET = ['peek', 'half', 'full'];
+const isMobile = () => window.matchMedia('(max-width: 860px)').matches;
+function setSheet(v) {
+  const p = $('#panel');
+  p.dataset.sheet = v;
+  if (viewer) viewer.setInset(isMobile() ? (v === 'peek' ? 168 : Math.round(window.innerHeight * 0.52)) - 24 : 0);
+  $('#sheetHandle').setAttribute('aria-label', v === 'full' ? 'Réduire le panneau' : 'Agrandir le panneau');
+}
+function bindSheet() {
+  setSheet('half');
+  const h = $('#sheetHandle');
+  let y0 = null, moved = false;
+  h.addEventListener('pointerdown', (e) => { y0 = e.clientY; moved = false; h.setPointerCapture(e.pointerId); });
+  h.addEventListener('pointermove', (e) => { if (y0 !== null && Math.abs(e.clientY - y0) > 12) moved = true; });
+  h.addEventListener('pointerup', (e) => {
+    const i = SHEET.indexOf($('#panel').dataset.sheet);
+    if (moved) setSheet(SHEET[Math.max(0, Math.min(2, i + (e.clientY < y0 ? 1 : -1)))]);
+    else setSheet(SHEET[(i + 1) % 3]);
+    y0 = null;
+  });
+  // Choisir une option en plein écran redescend le panneau pour montrer le résultat en 3D.
+  $('#panelBody').addEventListener('click', (e) => {
+    if (isMobile() && $('#panel').dataset.sheet === 'full' && e.target.closest('[data-k][data-v], [data-model]')) setSheet('half');
+  });
+}
+
+function webglAvailable() {
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; }
+}
+
+if (!webglAvailable()) {
+  const l0 = document.getElementById('loading'); l0.classList.add('fatal'); document.body.appendChild(l0);
+  l0.innerHTML = '<b>La 3D ne peut pas s\'afficher sur cet appareil.</b><span>Activez l\'accélération graphique du navigateur ou essayez Chrome, Safari ou Firefox à jour.</span>';
+} else {
+  init().catch((err) => {
+    console.error(err);
+    const l = document.getElementById('loading');
+    if (l) l.innerHTML = '<b>Le configurateur n\'a pas pu se charger.</b><span>Vérifiez votre connexion puis rechargez la page.</span><button class="btn primary small" onclick="location.reload()">Recharger</button>';
+    if (l) { l.classList.remove('hidden'); l.classList.add('fatal'); document.body.appendChild(l); }
+    (window.dataLayer ||= []).push({ event: 'configurator_error', message: String(err?.message || err) });
+  });
+}

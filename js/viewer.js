@@ -71,7 +71,7 @@ export class LanyardViewer {
     this.motion = mode !== 'studio';
     this.clock = new THREE.Clock();
     this.time = 0;
-    if (mode === 'hero') this.setupHero();
+    if (mode !== 'studio') this.setupHero();
 
     this.resize();
     if (mode !== 'studio') {
@@ -130,11 +130,26 @@ export class LanyardViewer {
     };
     bar(320, 760, -40, -620, 0.02);
     bar(180, 980, 260, -1000, -0.1);
-    const floor = new THREE.Mesh(new THREE.CylinderGeometry(900, 960, 60, 64), white);
-    floor.position.set(160, -760, -520); floor.receiveShadow = true;
-    this.decor.add(floor);
+    if (this.mode === 'hero') {
+      const floor = new THREE.Mesh(new THREE.CylinderGeometry(900, 960, 60, 64), white);
+      floor.position.set(160, -760, -520); floor.receiveShadow = true;
+      this.decor.add(floor);
+    } else {
+      // Configurateur : podium sous le produit (suit le point bas) et décor reculé.
+      this.decor.position.z = -380;
+      this.decor.scale.setScalar(1.15);
+      const podium = new THREE.Group();
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(120, 130, 26, 72), white);
+      disc.position.y = -13; disc.receiveShadow = true;
+      const step = new THREE.Mesh(new THREE.CylinderGeometry(160, 170, 14, 72), white);
+      step.position.y = -33; step.receiveShadow = true;
+      podium.add(disc, step);
+      this.podium = podium;
+      this.scene.add(podium);
+    }
     this.scene.add(this.decor);
     this.trails = [];
+    if (this.mode !== 'hero') return;
     for (let k = 0; k < 2; k++) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(81 * 3), 3));
@@ -229,7 +244,7 @@ export class LanyardViewer {
     this.mats.metal.clearcoat = metal ? 0 : 0.6;
     this.mats.plastic.color.set(metal ? '#151515' : hwHex);
 
-    const partsKey = JSON.stringify([geomKey, state.showcase, state.breakaway, state.buckle, state.attachment, state.kit, state.holder, state.holderOrientation, state.pass, state.logoVersion]);
+    const partsKey = JSON.stringify([geomKey, !!this.hardware, state.showcase, state.breakaway, state.buckle, state.attachment, state.kit, state.holder, state.holderOrientation, state.pass, state.logoVersion]);
     if (partsKey !== this.keys.parts || geomChanged) {
       this.keys.parts = partsKey;
       this.buildParts(state, product, model);
@@ -261,7 +276,7 @@ export class LanyardViewer {
       g.userData.explode = new THREE.Vector3(0, -depth, 0);
       this.chain.add(g);
       this.explodables.push(g);
-      this.addLabel(g, label, sub, new THREE.Vector3(34 + w, -10, 0));
+      this.addLabel(g, label, sub, new THREE.Vector3(70 + w, -10, 0));
       if (part.bottom) cursor = cursor.clone().add(part.bottom);
       return g;
     };
@@ -270,7 +285,7 @@ export class LanyardViewer {
     this.strapMesh.visible = !['holder', 'badge', 'pass'].includes(showcase);
     if (!this.strapMesh.visible) {
       this.chain.position.set(0, 0, 0);
-      const front = toTexture(passCanvas(state.pass, state.front.logoOn ? state.front : null, false), this.renderer);
+      const front = toTexture(passCanvas(state.pass, state.passArt || (state.front.logoOn ? state.front : null), false), this.renderer);
       const back = toTexture(passBackCanvas(state.pass, false), this.renderer);
       front.wrapS = back.wrapS = THREE.ClampToEdgeWrapping;
       const c = P.card(front, back, product.card, false, this.mats);
@@ -286,10 +301,10 @@ export class LanyardViewer {
       this.chainBottom = this.chain.position.clone();
       return;
     }
-    const end = state.buckle === 'detachable' ? P.buckle(w, this.mats) : P.crimp(w, this.mats);
+    const end = state.buckle === 'detachable' ? this.part('buckle', w, () => P.buckle(w, this.mats)) : this.part('crimp', w, () => P.crimp(w, this.mats));
     add(end, state.buckle === 'detachable' ? 'Boucle détachable' : 'Embout serti', state.buckle === 'detachable' ? 'Clip plastique' : 'Métal', 14);
     const attDef = product.attachments.find((a) => a.id === state.attachment);
-    const att = state.attachment !== 'none' ? P.buildAttachment(state.attachment, w, this.mats) : null;
+    const att = state.attachment !== 'none' ? this.attachment(state.attachment, w) : null;
     if (att) add(att, attDef.name, attDef.sub, 26);
     const canHold = att?.bottom && product.rules.holderNeedsAttachment.includes(state.attachment) && model.pose === 'neck';
     this.holderShown = false;
@@ -301,7 +316,7 @@ export class LanyardViewer {
         const hg = add(h, 'Porte-badge ' + hd.name, horizontal ? 'Horizontal' : 'Vertical', 34);
         this.holderShown = true;
         if (state.kit === 'pass') {
-          const front = toTexture(passCanvas(state.pass, state.front.logoOn ? state.front : null, horizontal), this.renderer);
+          const front = toTexture(passCanvas(state.pass, state.passArt || (state.front.logoOn ? state.front : null), horizontal), this.renderer);
           const back = toTexture(passBackCanvas(state.pass, horizontal), this.renderer);
           front.wrapS = back.wrapS = THREE.ClampToEdgeWrapping;
           const c = P.card(front, back, product.card, horizontal, this.mats);
@@ -318,7 +333,7 @@ export class LanyardViewer {
     }
     // Breakaway nuque
     if (state.breakaway === 'safety' && model.pose === 'neck') {
-      const b = P.breakaway(w, this.mats);
+      const b = this.part('breakaway', w, () => P.breakaway(w, this.mats));
       this.breakawayGroup = b.group;
       this.neck.add(b.group);
       this.addLabel(this.neck, 'Safety breakaway', 'Nuque', new THREE.Vector3(0, 40, 0));
@@ -333,6 +348,30 @@ export class LanyardViewer {
     const matName = product.materials.find((m) => m.id === state.material)?.name;
     this.addLabel(this.strapLabelAnchor, 'Ruban ' + matName, `${state.width} mm × ${state.length / 10} cm`, new THREE.Vector3(-60 - w, 0, 0), 'left');
     this.chainBottom = this.chain.position.clone().add(cursor);
+  }
+
+  // Pièce Blender si disponible, sinon version procédurale.
+  part(id, w, fallback) {
+    return this.hardware?.instance(id, this.mats, w) || fallback();
+  }
+
+  attachment(id, w) {
+    const hw = this.hardware;
+    if (id === 'double' && hw?.has('swivel') && hw?.has('keyring')) {
+      const g = new THREE.Group();
+      const a = hw.instance('swivel', this.mats, w); a.group.position.x = -2.5; a.group.rotation.z = -0.12; g.add(a.group);
+      const b = hw.instance('keyring', this.mats, w); b.group.position.x = 3.5; b.group.rotation.z = 0.35; b.group.scale.setScalar(0.8); g.add(b.group);
+      return { group: g, bottom: a.bottom.clone().applyAxisAngle(new THREE.Vector3(0, 0, 1), -0.12).add(new THREE.Vector3(-2.5, 0, 0)) };
+    }
+    if (['snaphook', 'swivel', 'keyring', 'plasticclip'].includes(id)) return this.part(id, w, () => P.buildAttachment(id, w, this.mats));
+    return P.buildAttachment(id, w, this.mats);
+  }
+
+  // Bibliothèque de pièces Blender chargée après coup : on reconstruit la chaîne.
+  setHardware(lib) {
+    this.hardware = lib;
+    this.keys.parts = null;
+    if (this.state) this.apply(this.state, this.product);
   }
 
   addLabel(parent, title, sub, offset, align = 'right') {
@@ -382,6 +421,8 @@ export class LanyardViewer {
 
   setExploded(on) { this.explodeTarget = on ? 1 : 0; }
 
+  transition() { if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) this.trans = { t: 0 }; }
+
   // ---------- Caméra ----------
   bounds() {
     this.root.updateMatrixWorld(true);
@@ -399,7 +440,9 @@ export class LanyardViewer {
     const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
     const fit = (h, w) => Math.max(h / 2 / Math.tan(fov / 2), (w / 2) / (Math.tan(fov / 2) * this.camera.aspect)) * 1.18;
-    const dist = fit(s.y, Math.max(s.x, s.z));
+    const vh = this.fixed?.height || this.container.clientHeight || 1;
+    const visible = this.insetBottom ? Math.max(0.35, (vh - this.insetBottom) / vh) : 1;
+    const dist = fit(s.y, Math.max(s.x, s.z)) / visible;
     const at = (dir, target, d) => ({ pos: target.clone().addScaledVector(dir.normalize(), d), target });
     switch (name) {
       case 'back': return at(new THREE.Vector3(-0.1, 0.05, -1), c, dist);
@@ -407,13 +450,14 @@ export class LanyardViewer {
       case 'side': return at(new THREE.Vector3(1, 0.05, 0.05), c, dist);
       case 'detail': {
         const t = this.chain.position.clone().add(new THREE.Vector3(0, -40, 0));
-        return at(new THREE.Vector3(0.55, 0.2, 1), t, 240);
+        return at(new THREE.Vector3(0.55, 0.2, 1), t, 240 / visible);
       }
       case 'neck': return at(new THREE.Vector3(0.1, 0.6, -1), new THREE.Vector3(0, 0, 0), 420);
       case 'macro': {
         const f = this.strap.frames[Math.round(this.strap.M * 0.9)];
-        return at(f.N.clone().add(new THREE.Vector3(0.25, 0.1, 0)), f.p.clone(), 120 + this.strap.params.width * 2);
+        return at(f.N.clone().add(new THREE.Vector3(0.25, 0.1, 0)), f.p.clone(), (120 + this.strap.params.width * 2) / visible);
       }
+      case 'showcase': return at(new THREE.Vector3(0.42, -0.02, 1), c.clone().add(new THREE.Vector3(0, -s.y * 0.18, 0)), dist * 0.66);
       case 'hero': return at(new THREE.Vector3(0.05, -0.1, 1), c.clone().add(new THREE.Vector3(0, -s.y * (this.heroFocus ?? 0.12), 0)), dist * (this.heroZoom ?? 0.62));
       case 'threeq': return at(new THREE.Vector3(0.75, 0.18, 0.85), c, dist);
       default: return at(new THREE.Vector3(0.18, 0.06, 1), c, dist);
@@ -450,6 +494,8 @@ export class LanyardViewer {
     if (this.decor) this.decor.position.x = Math.sin(t * 0.2) * 12;
   }
 
+  setInset(px) { this.insetBottom = px; this.resize(); }
+
   setAutoRotate(on) { if (this.controls) this.controls.autoRotate = on; }
 
   // Taille fixe (vitrine hors écran) : vignettes portrait ou paysage.
@@ -466,6 +512,9 @@ export class LanyardViewer {
     this.renderer.domElement.style.height = '100%';
     this.labels?.setSize(w, h);
     this.camera.aspect = w / h;
+    // Panneau mobile par-dessus le bas du viewer : on recentre l'image dans la partie visible.
+    if (this.insetBottom) this.camera.setViewOffset(w, h, 0, this.insetBottom / 2, w, h);
+    else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   }
 
@@ -511,8 +560,17 @@ export class LanyardViewer {
       const box = this.strap.geometry.boundingBox;
       const low = Math.min(box.min.y, this.chainBottom?.y ?? box.min.y) - (this.holderShown ? 120 : 40);
       this.ground.position.y = lerp(this.ground.position.y, low, 0.2);
+      if (this.podium) { this.podium.position.y = this.ground.position.y + 0.5; this.podium.visible = this.currentView !== 'top'; }
     }
     if (this.mode === 'hero') this.heroPose(this.time);
+    else if (this.trans) {
+      // Changement de modèle : le nouveau produit entre en tournant légèrement (~450 ms).
+      this.trans.t = Math.min(1, this.trans.t + dt / 0.45);
+      const k = ease(this.trans.t);
+      this.root.scale.setScalar(0.9 + 0.1 * k);
+      this.root.rotation.y = (1 - k) * -0.55;
+      if (this.trans.t >= 1) { this.trans = null; this.root.scale.setScalar(1); this.root.rotation.y = 0; }
+    }
     if (this.camAnim) {
       const a = this.camAnim;
       a.t = Math.min(1, a.t + dt * 1.6);

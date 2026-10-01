@@ -1,0 +1,5 @@
+docs/
+tools/
+hardware-master/scripts/
+hardware-master/export/*.blend
+README.md

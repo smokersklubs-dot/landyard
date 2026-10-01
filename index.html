@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SKLUBS — Configurateur Lanyard 3D</title>
+  <meta name="theme-color" content="#F5F5F3">
+  <meta property="og:title" content="SKLUBS — Configurateur Lanyard 3D">
+  <meta property="og:description" content="Configurez votre lanyard en 3D : modèle, matière, logo répété, attaches, porte-badge et pass.">
+  <link rel="modulepreload" href="vendor/three/build/three.module.js">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23111%22/%3E%3Cpath d=%22M16 6c2 4 7 7 7 12a7 7 0 0 1-14 0c0-5 5-8 7-12z%22 fill=%22%23FF6A00%22/%3E%3C/svg%3E">
   <meta name="description" content="SKLUBS EVENT 3D : configurez votre lanyard en 3D — modèle, dimensions, matière, marquage répété, attaches, porte-badge et pass.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,12 +16,13 @@
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     { "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
     } }
   </script>
 </head>
 <body>
+  <noscript><p class="noscript">Le configurateur SKLUBS a besoin de JavaScript pour afficher la 3D.</p></noscript>
   <header class="nav">
     <button class="wordmark" data-go="home" aria-label="Accueil SKLUBS">SKLUBS</button>
     <nav class="nav-links">
@@ -99,6 +105,7 @@
       </div>
 
       <aside class="panel" id="panel">
+        <button class="sheet-handle" id="sheetHandle" aria-label="Agrandir ou réduire le panneau"><span></span></button>
         <div class="panel-head">
           <p class="step-index" id="stepIndex">03</p>
           <h1 class="step-title" id="stepTitle">Choix du modèle</h1>
@@ -117,7 +124,7 @@
   </section>
 
   <div class="studio" id="studio" aria-hidden="true"></div>
-  <div class="drop-overlay" aria-hidden="true"><div><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg><b>Déposez votre logo</b><span>PNG, JPG ou SVG — il s'applique directement sur le ruban</span></div></div>
+  <div class="drop-overlay" aria-hidden="true"><div><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg><b>Déposez votre logo</b><span>SVG, PDF, PNG ou JPG — il s'applique directement sur le ruban</span></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog class="modal" id="modal">
     <form method="dialog">
@@ -126,7 +133,8 @@
       <div class="modal-actions" id="modalActions"><button class="btn ghost">Fermer</button></div>
     </form>
   </dialog>
-  <input type="file" id="logoFile" accept="image/png,image/jpeg,image/svg+xml" hidden>
+  <input type="file" id="passFile" accept="image/svg+xml,image/png,image/jpeg" hidden>
+  <input type="file" id="logoFile" accept="image/svg+xml,application/pdf,image/png,image/jpeg" hidden>
 
   <script type="module" src="js/main.js"></script>
 </body>
