@@ -1,6 +1,6 @@
 // SKLUBS EVENT 3D — parcours Lanyard (écrans 01 → 12), état, panneaux, export projet.
 import { LanyardViewer } from './viewer.js';
-import { ensureFonts, stripTexture, flatPreview, ORANGE } from './artwork.js';
+import { ensureFonts, stripTexture, flatPreview, ORANGE, rasterizeLogo, hasLightBackground, removeLightBackground } from './artwork.js';
 import { sanitize, computePrice, allowedMethods, allowedAttachments, canHoldBadge, modelOf } from './pricing.js';
 
 const PRODUCT_URL = 'products/lanyard/product.json';
@@ -50,7 +50,7 @@ function defaultState(modelId = 'classic') {
     kit: 'pass', holder: 'pvcsoft', holderOrientation: 'vertical',
     pass: { event: 'SKLUBS', name: 'Prénom Nom', role: 'VIP', date: '12 — 14 JUIN 2026', accent: ORANGE, bg: '#121212' },
     quantity: product.quantity.default, logoVersion: 0,
-    ui: { dims: false, explode: false, editSide: 'front' },
+    ui: { dims: false, explode: false, editSide: 'front', persoTab: 'logo', guides: false },
   };
   return sanitize(product, s);
 }
@@ -127,6 +127,8 @@ function setStep(i, force = false) {
   step = Math.max(0, Math.min(STEPS.length - 1, i));
   const s = STEPS[step];
   state.ui.dims = s.id === 'dims';
+  state.ui.guides = s.id === 'perso';
+  $('#logoCta').hidden = !!state.front.logoName || s.id === 'perso';
   if (s.id !== 'view' && state.ui.explode) { state.ui.explode = false; viewer.setExploded(false); }
   $('#stepIndex').textContent = s.n + ' / 12';
   $('#stepTitle').textContent = s.title;
@@ -134,10 +136,11 @@ function setStep(i, force = false) {
   $('#page-config').dataset.step = s.id;
   renderSteps();
   renderPanel();
+  if (prev !== step || force) $('#panelBody').scrollTop = 0;
   renderRail();
   refresh();
   if (prev !== step || force) {
-    const view = { dims: 'front', attach: 'detail', badge: 'front', material: 'macro', print: 'front', final: 'front' }[s.id];
+    const view = { dims: 'front', attach: 'detail', badge: 'front', material: 'macro', perso: 'macro', print: 'front', final: 'front' }[s.id];
     if (view) viewer.setView(view); else if (force) viewer.setView('front');
   }
   $('#backBtn').title = step === 0 ? 'Catégories' : 'Étape précédente';
@@ -242,16 +245,46 @@ function renderPanel() {
   }
   if (id === 'perso') {
     const k = sideKey(), s = state[k];
-    html = (state.backMode === 'different' ? group('Face éditée', `<div class="chips">${chip('ui.editSide', 'front', 'Recto', state.ui.editSide)}${chip('ui.editSide', 'back', 'Verso', state.ui.editSide)}</div>`) : '') +
-      group('Logo', `<div class="upload"><button class="btn ghost" id="importLogo">Importer un logo</button>
-          <span class="file">${s.logoName ? esc(s.logoName) + ` <button class="link-btn" id="removeLogo">Retirer</button>` : 'Pictogramme SKLUBS par défaut'}</span></div>
-          ${toggle(k + '.logoOn', s.logoOn, 'Afficher le logo')}
-          ${!s.logoName ? `<div class="field"><label>Couleur du pictogramme</label>${swatches(k + '.iconColor', product.colors, s.iconColor)}</div>` : ''}`, 'PNG, JPG ou SVG') +
-      group('Texte', `${toggle(k + '.textOn', s.textOn, 'Ajouter un texte')}
-          <div class="field"><input type="text" data-k="${k}.text" value="${esc(s.text)}" maxlength="28" placeholder="Votre texte"></div>
-          <div class="field"><label>Couleur du texte</label>${swatches(k + '.textColor', product.colors, s.textColor)}</div>`) +
-      group('Taille', range(k + '.scale', s.scale, 20, 95, 1, '%'), 'Hauteur / largeur du ruban') +
-      group('Rotation', `<div class="chips">${[0, 90, 180, 270].map((r) => chip(k + '.rotation', r, r + '°', s.rotation, 'data-t="num"')).join('')}</div>`);
+    const tab = state.ui.persoTab || 'logo';
+    const tabs = [['logo', 'Logo & texte'], ['position', 'Position'], ['size', 'Taille'], ['rotation', 'Rotation'], ['color', 'Couleur'], ['repeat', 'Répétition']];
+    html = `<div class="tabs" role="tablist">${tabs.map(([v, t]) => `<button role="tab" aria-selected="${v === tab}" class="${v === tab ? 'is-on' : ''}" data-k="ui.persoTab" data-v="${v}">${t}</button>`).join('')}</div>`;
+    if (state.backMode === 'different') html += group('Face éditée', `<div class="chips">${chip('ui.editSide', 'front', 'Recto', state.ui.editSide)}${chip('ui.editSide', 'back', 'Verso', state.ui.editSide)}</div>`);
+    if (tab === 'logo') {
+      html += `<div class="drop ${s.logoName ? 'has-logo' : ''}" id="dropZone">
+          <button class="import" id="importLogo"><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg></span>
+            <span><b>${s.logoName ? 'Remplacer le logo' : 'Importer un logo'}</b><small>PNG, JPG ou SVG · ou glissez-déposez ici</small></span></button>
+          ${s.logoName ? `<div class="logo-card"><span class="logo-prev" style="--bg:${state.color}"><img id="logoPrev" alt="Votre logo"></span>
+            <span class="meta"><b>${esc(s.logoName)}</b><small>Appliqué sur le ${k === 'back' ? 'verso' : state.backMode === 'same' ? 'recto et le verso' : 'recto'}${state.kit === 'pass' ? ' et sur le pass' : ''}</small></span>
+            <button class="link-btn" id="removeLogo">Retirer</button></div>
+            ${toggle(k + '.logoBgRemoved', !!s.logoBgRemoved, 'Retirer le fond blanc', 'Garde uniquement le dessin du logo')}` : ''}
+        </div>
+        ${toggle(k + '.logoOn', s.logoOn, s.logoName ? 'Afficher mon logo' : 'Afficher le pictogramme SKLUBS')}
+        <div class="text-row">${toggle(k + '.textOn', s.textOn, 'Ajouter un texte', 'Nom de marque, événement, slogan')}
+          <div class="field"><input type="text" id="artText" data-k="${k}.text" value="${esc(s.text)}" maxlength="28" placeholder="Votre texte" aria-label="Texte imprimé"></div></div>` +
+        group("Zones d'impression", `<div class="zones">${[['none', 'Recto', 'front'], ['same', 'Recto + Verso', 'threeq'], ['different', 'Verso différent', 'back']].map(([v, t, view]) => `<button class="zone ${state.backMode === v ? 'is-on' : ''}" data-k="backMode" data-v="${v}"><img data-zone="${view}" alt=""><b>${t}</b></button>`).join('')}</div>`);
+    }
+    if (tab === 'position') {
+      html += group('Mise en page', `<div class="chips">${chip(k + '.mode', 'repeat', 'Répété sur tout le ruban', s.mode)}${chip(k + '.mode', 'single', 'Une fois de chaque côté', s.mode)}</div>`) +
+        group(s.mode === 'repeat' ? 'Décalage du motif' : 'Position depuis le bas', range(k + '.offset', s.offset, s.mode === 'repeat' ? 0 : -80, 200, 1, 'mm'), 'Le long du ruban') +
+        `<p class="note">Le cadre orange sur le ruban montre la zone occupée par chaque logo.</p>`;
+    }
+    if (tab === 'size') html += group('Taille du logo', range(k + '.scale', s.scale, 20, 95, 1, '%'), `Hauteur ≈ ${Math.round(state.width * s.scale / 100)} mm sur ${state.width} mm`);
+    if (tab === 'rotation') {
+      html += group('Rotation', `<div class="chips">${[0, 90, 180, 270].map((r) => chip(k + '.rotation', r, r + '°', s.rotation, 'data-t="num"')).join('')}</div>`) +
+        group('Sens de lecture', `<div class="chips">${chip('mirror', 'false', 'Continu', String(state.mirror), 'data-t="bool"')}${chip('mirror', 'true', 'Lisible des deux côtés', String(state.mirror), 'data-t="bool"')}</div>`);
+    }
+    if (tab === 'color') {
+      const tints = [{ name: "Couleurs d'origine", hex: '' }, ...product.colors.filter((c) => ['white', 'black', 'orange'].includes(c.id))];
+      html += (s.logoName ? group('Couleur du logo', `<div class="chips">${tints.map((t) => chip(k + '.logoTint', t.hex, t.hex ? `<i class="dot" style="--c:${t.hex}"></i>${t.name}` : t.name, s.logoTint || '')).join('')}</div>`) :
+        group('Couleur du pictogramme', swatches(k + '.iconColor', product.colors, s.iconColor))) +
+        group('Couleur du texte', swatches(k + '.textColor', product.colors, s.textColor)) +
+        group('Liseré', `<div class="chips">${[['', 'Aucun'], [ORANGE, 'Orange'], ['#F4F4F2', 'Blanc'], ['#141414', 'Noir']].map(([v, t]) => chip(k + '.edge', v, t, s.edge || '')).join('')}</div>`, 'Filets le long des bords');
+    }
+    if (tab === 'repeat') {
+      html += group('Répétition', `<div class="chips">${chip(k + '.mode', 'single', 'Simple', s.mode)}${chip(k + '.mode', 'repeat', 'Répété', s.mode)}</div>
+          ${s.mode === 'repeat' ? `<div class="field"><label>Espacement (entraxe)</label>${range(k + '.spacing', s.spacing, 30, 250, 1, 'mm')}</div>` : ''}`) +
+        group('Aperçu sur 1 mètre', `<canvas class="flat" id="flatFront" width="720" height="64"></canvas><div class="ruler"><span>0</span><span>25</span><span>50</span><span>75</span><span>100 cm</span></div>`, '<span id="pitchOut"></span>');
+    }
   }
   if (id === 'print') {
     const methods = allowedMethods(product, state.material);
@@ -312,8 +345,58 @@ function renderPanel() {
       </div>`;
   }
   $('#panelBody').innerHTML = html;
+  if (id === 'perso') afterPerso();
   if (id === 'qty') $('#priceBig').innerHTML = bigPrice();
   if (id === 'view') $('#tree').innerHTML = treeHTML();
+}
+
+const zoneCache = { key: null, imgs: {} };
+function afterPerso() {
+  const s = state[sideKey()];
+  const prev = $('#logoPrev');
+  if (prev && s.logoImage) prev.src = s.logoImage.toDataURL ? s.logoImage.toDataURL() : s.logoImage.src;
+  if ((state.ui.persoTab || 'logo') === 'repeat') drawFlat();
+  const imgs = $$('[data-zone]');
+  if (!imgs.length) return;
+  const key = viewer.keys.art + state.backMode;
+  const fill = () => imgs.forEach((im) => { im.src = zoneCache.imgs[im.dataset.zone] || ''; });
+  if (zoneCache.key === key) return fill();
+  requestIdle(() => {
+    studio.setSize(240, 300);
+    studio.apply({ ...state, kit: 'lanyard', ui: { ...state.ui, guides: false, dims: false } }, product);
+    for (const v of ['front', 'threeq', 'back']) zoneCache.imgs[v] = studio.snapshot(v === 'front' ? 'macro' : v);
+    studio.setSize(360, 460);
+    zoneCache.key = key;
+    if (STEPS[step].id === 'perso') fill();
+  });
+}
+
+// Import d'un logo (bouton, glisser-déposer, raccourcis) : rastérisé, fond blanc retiré si détecté.
+function loadLogoFile(f, { goPerso = false } = {}) {
+  if (!f) return;
+  if (!/^image\/(png|jpe?g|svg\+xml)$/.test(f.type)) { toast('Format non pris en charge. Utilisez un PNG, JPG ou SVG.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const s = state[sideKey()];
+      const raster = rasterizeLogo(img);
+      const light = hasLightBackground(raster);
+      s.logoSrc = raster; s.logoBgRemoved = light;
+      s.logoImage = light ? removeLightBackground(raster) : raster;
+      // Le texte d'exemple « SKLUBS » laisse la place au logo du client.
+      if (!s.logoName && s.text === 'SKLUBS') { s.textOn = false; s.scale = Math.max(s.scale, 72); }
+      s.logoName = f.name; s.logoData = reader.result; s.logoOn = true;
+      state.logoVersion++;
+      if (goPerso || currentPage !== 'config') { state.ui.persoTab = 'logo'; step = STEPS.findIndex((x) => x.id === 'perso'); go('config'); }
+      else { refresh(); renderPanel(); viewer.setView('macro'); }
+      $('#logoCta').hidden = true;
+      toast(light ? 'Logo importé, fond blanc retiré. Il se répète sur le ruban.' : 'Logo importé : il se répète sur le ruban.');
+    };
+    img.onerror = () => toast('Image illisible. Utilisez un PNG, JPG ou SVG.');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(f);
 }
 
 function bigPrice() {
@@ -411,7 +494,7 @@ function renderCategories() {
 
 // ---------- Projet ----------
 function serializable() {
-  const strip = (s) => { const { logoImage, ...r } = s; return r; };
+  const strip = (s) => { const { logoImage, logoSrc, ...r } = s; return r; };
   return { ...state, front: strip(state.front), back: strip(state.back), ui: undefined };
 }
 
@@ -556,7 +639,8 @@ function bindGlobal() {
       }
       case 'heroNext': showHero(heroCat + 1); break;
       case 'importLogo': $('#logoFile').click(); break;
-      case 'removeLogo': { const s = state[sideKey()]; s.logoImage = null; s.logoName = null; s.logoData = null; state.logoVersion++; refresh(); renderPanel(); break; }
+      case 'logoCta': case 'heroLogo': logoIntent = true; $('#logoFile').click(); break;
+      case 'removeLogo': { const s = state[sideKey()]; s.logoImage = null; s.logoSrc = null; s.logoName = null; s.logoData = null; s.logoTint = ''; state.logoVersion++; refresh(); renderPanel(); $('#logoCta').hidden = STEPS[step].id === 'perso'; break; }
       case 'addProject': {
         const items = store.get(PROJECT_KEY) || [];
         items.push({ title: modelOf(product, state.model).name, spec: `${state.width} mm × ${state.length / 10} cm · ${state.quantity} pcs`, thumb: viewer.snapshot(), config: serializable() });
@@ -568,7 +652,7 @@ function bindGlobal() {
       case 'bagBtn': showProject(); break;
       case 'resumeBtn': {
         const saved = store.get(STORE_KEY);
-        if (saved) { state = sanitize(product, { ...defaultState(saved.model), ...saved, front: { ...defaultState().front, ...saved.front }, back: { ...defaultState().back, ...saved.back }, ui: { dims: false, explode: false, editSide: 'front' } }); }
+        if (saved) { state = sanitize(product, { ...defaultState(saved.model), ...saved, front: { ...defaultState().front, ...saved.front }, back: { ...defaultState().back, ...saved.back }, ui: { dims: false, explode: false, editSide: 'front', persoTab: 'logo', guides: false } }); }
         step = 0; go('config'); break;
       }
       default: break;
@@ -592,6 +676,7 @@ function bindGlobal() {
     if (k === 'buckle') v = el.checked ? 'detachable' : 'none';
     if (el.dataset.t === 'hex') { if (!/^#[0-9a-f]{6}$/i.test(v)) return; }
     setPath(k, v);
+    if (k.endsWith('.logoBgRemoved')) { const sd = state[k.split('.')[0]]; if (sd.logoSrc) sd.logoImage = v ? removeLightBackground(sd.logoSrc) : sd.logoSrc; state.logoVersion++; }
     const out = $(`[data-out="${k}"]`);
     if (out) out.textContent = `${v} ${out.textContent.split(' ').slice(1).join(' ')}`;
     refresh();
@@ -600,26 +685,21 @@ function bindGlobal() {
   document.addEventListener('input', onInput);
   document.addEventListener('change', (e) => { if (e.target.type === 'checkbox' || e.target.type === 'color' || e.target.id === 'hwCustom') onInput(e); });
 
-  $('#logoFile').addEventListener('change', (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const s = state[sideKey()];
-        s.logoImage = img; s.logoName = f.name; s.logoData = reader.result; s.logoOn = true;
-        state.logoVersion++;
-        refresh(); renderPanel();
-        toast('Logo importé : il se répète sur le ruban.');
-      };
-      img.onerror = () => toast('Image illisible. Utilisez un PNG, JPG ou SVG.');
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(f);
-    e.target.value = '';
+  $('#logoFile').addEventListener('change', (e) => { loadLogoFile(e.target.files[0], { goPerso: logoIntent }); logoIntent = false; e.target.value = ''; });
+
+  // Glisser-déposer un logo n'importe où sur la page
+  let depth = 0;
+  const hasFile = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  document.addEventListener('dragenter', (e) => { if (!hasFile(e)) return; e.preventDefault(); depth++; document.body.classList.add('dragging'); });
+  document.addEventListener('dragover', (e) => { if (hasFile(e)) e.preventDefault(); });
+  document.addEventListener('dragleave', () => { depth = Math.max(0, depth - 1); if (!depth) document.body.classList.remove('dragging'); });
+  document.addEventListener('drop', (e) => {
+    if (!hasFile(e)) return;
+    e.preventDefault(); depth = 0; document.body.classList.remove('dragging');
+    loadLogoFile(e.dataTransfer.files[0], { goPerso: true });
   });
 }
+let logoIntent = false;
 
 init().catch((err) => {
   console.error(err);

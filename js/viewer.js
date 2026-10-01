@@ -198,7 +198,7 @@ export class LanyardViewer {
     this.mats.edge.color.copy(base);
 
     // Marquage (textures)
-    const side = (s, enabled) => ({ ...s, enabled, bg: state.color });
+    const side = (s, enabled) => ({ ...s, enabled, bg: state.color, guides: !!state.ui?.guides });
     const backSide = state.backMode === 'same' ? side(state.front, true) : side(state.back, state.backMode === 'different');
     const frontSide = side(state.front, true);
     const artKey = JSON.stringify([geomKey, state.color, state.method, strip(frontSide), strip(backSide), state.logoVersion]);
@@ -542,6 +542,6 @@ export class LanyardViewer {
 }
 
 function strip(side) {
-  const { logoImage, logoData, ...rest } = side;
+  const { logoImage, logoData, logoSrc, ...rest } = side;
   return rest;
 }

@@ -58,7 +58,13 @@ export function buildMotif(side, hPx) {
   let x = pad;
   if (hasIcon) {
     const y = (hPx - iconH) / 2;
-    if (img) ctx.drawImage(img, x, y, iconW, iconH);
+    if (img && side.logoTint) {
+      const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(iconW)); t.height = Math.max(1, Math.round(iconH));
+      const tc = t.getContext('2d');
+      tc.drawImage(img, 0, 0, t.width, t.height);
+      tc.globalCompositeOperation = 'source-in'; tc.fillStyle = side.logoTint; tc.fillRect(0, 0, t.width, t.height);
+      ctx.drawImage(t, x, y, iconW, iconH);
+    } else if (img) ctx.drawImage(img, x, y, iconW, iconH);
     else drawDrop(ctx, x, y, iconH, side.iconColor || ORANGE);
     x += iconW + gap;
   }
@@ -138,6 +144,17 @@ export function motifForSide(side, widthMM, ppm, method) {
   return { canvas: out, lengthMM: out.width / ppm, heightMM: out.height / ppm };
 }
 
+// Cadre de placement : contour orange + poignées aux coins (écran Personnalisation).
+function drawGuide(ctx, x, y, w, h, ppm) {
+  const lw = Math.max(1, 0.35 * ppm), r = Math.max(2, 0.8 * ppm);
+  ctx.save();
+  ctx.strokeStyle = ORANGE; ctx.lineWidth = lw; ctx.setLineDash([lw * 4, lw * 3]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.setLineDash([]); ctx.fillStyle = ORANGE;
+  for (const [px, py] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h]]) { ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+}
+
 // Liseré : deux filets parallèles aux bords du ruban.
 function drawEdges(ctx, w, h, ppm, color) {
   if (!color) return;
@@ -163,7 +180,9 @@ export function stripTexture({ side, widthMM, lengthMM, drop, method, maxTex = 4
     if (side.enabled) drawEdges(ctx, c.width, c.height, ppm, side.edge);
     if (hasArt) {
       const m = motifForSide(side, widthMM, ppm, method);
-      ctx.drawImage(m.canvas, Math.round((c.width - m.canvas.width) / 2), Math.round((c.height - m.canvas.height) / 2));
+      const mx = Math.round((c.width - m.canvas.width) / 2), my = Math.round((c.height - m.canvas.height) / 2);
+      ctx.drawImage(m.canvas, mx, my);
+      if (side.guides) drawGuide(ctx, mx, Math.max(1, my), m.canvas.width, Math.min(c.height - 2, m.canvas.height), ppm);
     }
     return { canvas: c, repeat: lengthMM / pitch, offset: -(side.offset || 0) / pitch, pitch };
   }
@@ -180,6 +199,7 @@ export function stripTexture({ side, widthMM, lengthMM, drop, method, maxTex = 4
       ctx.save();
       ctx.translate(s * ppm, c.height / 2);
       ctx.drawImage(m.canvas, -m.canvas.width / 2, -m.canvas.height / 2);
+      if (side.guides) drawGuide(ctx, -m.canvas.width / 2, Math.max(-c.height / 2 + 1, -m.canvas.height / 2), m.canvas.width, Math.min(c.height - 2, m.canvas.height), ppm);
       ctx.restore();
     }
   }
@@ -319,4 +339,57 @@ export function passBackCanvas(pass, horizontal = false) {
   ctx.fillText('Pass nominatif · non cessible', W / 2, H / 2 + 34);
   ctx.fillStyle = pass.accent || ORANGE; ctx.fillRect(W / 2 - 40, H / 2 + 60, 80, 6);
   return c;
+}
+
+// ---------- Logo importé ----------
+// Rastérise (SVG compris) à une taille de travail raisonnable.
+export function rasterizeLogo(img, max = 1024) {
+  const w0 = img.naturalWidth || img.width || 512, h0 = img.naturalHeight || img.height || 512;
+  const k = Math.min(1, max / Math.max(w0, h0)) || 1;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w0 * k)); c.height = Math.max(1, Math.round(h0 * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+
+const isLight = (a, i) => a[i + 3] < 20 || (a[i] > 228 && a[i + 1] > 228 && a[i + 2] > 228);
+
+// Le pourtour du logo est-il blanc (fond à retirer) ?
+export function hasLightBackground(c) {
+  const { width: w, height: h } = c, a = c.getContext('2d').getImageData(0, 0, w, h).data;
+  let light = 0, n = 0, opaqueLight = 0;
+  const probe = (x, y) => { const i = (y * w + x) * 4; n++; if (isLight(a, i)) { light++; if (a[i + 3] >= 20) opaqueLight++; } };
+  for (let x = 0; x < w; x += Math.max(1, w >> 6)) { probe(x, 0); probe(x, h - 1); }
+  for (let y = 0; y < h; y += Math.max(1, h >> 6)) { probe(0, y); probe(w - 1, y); }
+  return light / n > 0.9 && opaqueLight / n > 0.5;
+}
+
+// Retire le fond blanc relié aux bords (le blanc à l'intérieur du logo est conservé), puis recadre.
+export function removeLightBackground(src) {
+  const w = src.width, h = src.height;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(src, 0, 0);
+  const d = ctx.getImageData(0, 0, w, h), a = d.data;
+  const seen = new Uint8Array(w * h), stack = [];
+  const push = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const p = y * w + x; if (seen[p]) return; seen[p] = 1; if (isLight(a, p * 4)) stack.push(p); };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  while (stack.length) {
+    const p = stack.pop(), x = p % w, y = (p - x) / w;
+    a[p * 4 + 3] = 0;
+    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+  }
+  ctx.putImageData(d, 0, 0);
+  return trimTransparent(c);
+}
+
+export function trimTransparent(c) {
+  const { width: w, height: h } = c, a = c.getContext('2d').getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (a[(y * w + x) * 4 + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return c;
+  const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+  out.getContext('2d').drawImage(c, -x0, -y0);
+  return out;
 }

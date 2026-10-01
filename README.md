@@ -24,7 +24,7 @@ Un serveur HTTP est nécessaire (le produit est chargé depuis `products/lanyard
 | 04 | Vue 3D | Rotation 360°, avant, arrière, dessus, profil, nuque, attache, macro matière, **vue éclatée annotée** + arbre `LANYARD_MASTER` |
 | 05 | Dimensions | Largeur, longueur (ou sur mesure), cotes orange sur le modèle |
 | 06 | Matière & couleur | Polyester, satin, RPET, tissé, bambou, tubulaire (cartes de normales procédurales), nuancier + HEX, finition |
-| 07 | Personnalisation | Import logo PNG/JPG/SVG, texte, couleurs, taille, rotation |
+| 07 | Personnalisation | Onglets Logo & texte, Position, Taille, Rotation, Couleur, Répétition ; grand bouton « Importer un logo » (PNG, JPG, SVG), fond blanc retiré automatiquement, logo en couleurs d'origine ou monochrome, liseré, cadre de placement orange sur le ruban, zones d'impression recto / recto-verso / verso différent |
 | 08 | Impression & répétition | Sérigraphie (réduction auto à 3 couleurs), sublimation, tissage ; recto / recto-verso / verso différent ; simple ou répété, entraxe, décalage, sens de lecture ; aperçu à plat sur 1 m |
 | 09 | Attaches | Mousqueton, crochet tournant, clip plastique, anneau, double attache, patch téléphone, sans ; safety breakaway ; boucle détachable ; couleur métal |
 | 10 | Badge & pass | *Complete your event kit* : lanyard seul / + porte-badge / + porte-badge + pass imprimé ; PVC souple, PVC rigide, cuir ; vertical / horizontal ; pass CR80 personnalisé |
@@ -32,6 +32,9 @@ Un serveur HTTP est nécessaire (le produit est chargé depuis `products/lanyard
 | 12 | Finalisation | Récapitulatif, ajouter au projet, demander un devis, sauvegarder (JSON + PNG) |
 
 Mobile : viewer en haut, panneau dessous, barre d'actions collante.
+
+Le logo peut être ajouté partout : bouton « Importer mon logo » de l'accueil, bouton « Ajouter mon logo » dans la vue 3D,
+ou glisser-déposer d'un fichier n'importe où sur la page. Il est appliqué au ruban (recto, verso) et au pass imprimé.
 
 ## Architecture
 

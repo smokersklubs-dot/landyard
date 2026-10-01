@@ -48,6 +48,7 @@
         <p class="lead">Lanyards, bracelets, badges et accessoires événementiels personnalisés. Pour vos marques, événements et équipes.</p>
         <div class="hero-cta">
           <button class="btn primary big" data-go="category">Configurer mon lanyard <span class="arrow">→</span></button>
+          <button class="btn ghost big" id="heroLogo"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg>Importer mon logo</button>
           <button class="link-btn" id="resumeBtn" hidden>Reprendre mon projet enregistré</button>
         </div>
         <ul class="features">
@@ -90,6 +91,7 @@
           <button data-view="detail" title="Détails"><svg viewBox="0 0 24 24"><path d="M9 4v6a3 3 0 0 0 6 0V8"/><path d="M12 13v2a4 4 0 1 1-4 4"/></svg><span>Détails</span></button>
           <button data-tool="explode" title="Vue éclatée"><svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="5" rx="1"/><rect x="8" y="10" width="8" height="4" rx="1"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg><span>Vue éclatée</span></button>
         </div>
+        <button class="logo-cta" id="logoCta"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg>Ajouter mon logo</button>
         <div class="viewer-foot">
           <p class="spec" id="specLine"></p>
           <p class="hint">Glisser pour tourner · Molette pour zoomer</p>
@@ -115,6 +117,7 @@
   </section>
 
   <div class="studio" id="studio" aria-hidden="true"></div>
+  <div class="drop-overlay" aria-hidden="true"><div><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg><b>Déposez votre logo</b><span>PNG, JPG ou SVG — il s'applique directement sur le ruban</span></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog class="modal" id="modal">
     <form method="dialog">
