@@ -33,15 +33,17 @@ const STEPS = [
 let product, state, viewer, hero, studio;
 let step = 0;
 const modelThumbs = {};
+const catThumbs = {};
+let heroCat = 0;
 
 function defaultState(modelId = 'classic') {
   const m = modelOf(product, modelId);
   const s = {
     model: modelId, width: m.defaultWidth, length: m.defaultLength, customLength: false,
     material: m.defaultMaterial, color: '#141414', finish: 'matte', method: m.defaultMethod,
-    front: { mode: 'repeat', logoOn: true, logoImage: null, logoName: null, textOn: true, text: 'SKLUBS', textColor: '#F4F4F2', iconColor: ORANGE, scale: 62, rotation: 0, spacing: 85, offset: 0 },
+    front: { mode: 'repeat', edge: ORANGE, logoOn: true, logoImage: null, logoName: null, textOn: true, text: 'SKLUBS', textColor: '#F4F4F2', iconColor: ORANGE, scale: 62, rotation: 0, spacing: 85, offset: 0 },
     backMode: 'same',
-    back: { mode: 'repeat', logoOn: false, logoImage: null, logoName: null, textOn: true, text: 'EVENT 2026', textColor: ORANGE, iconColor: ORANGE, scale: 50, rotation: 0, spacing: 70, offset: 0 },
+    back: { mode: 'repeat', edge: ORANGE, logoOn: false, logoImage: null, logoName: null, textOn: true, text: 'EVENT 2026', textColor: ORANGE, iconColor: ORANGE, scale: 50, rotation: 0, spacing: 70, offset: 0 },
     mirror: false,
     breakaway: m.pose === 'neck' ? 'safety' : 'none', buckle: 'none',
     attachment: m.defaultAttachment || 'snaphook', hardwareColor: 'chrome', hardwareHex: '#FF6A00',
@@ -63,8 +65,7 @@ async function init() {
   renderSteps();
 
   hero = new LanyardViewer($('#heroStage'), { mode: 'hero' });
-  hero.apply(state, product);
-  hero.setView('hero', true);
+  showHero(0);
 
   viewer = new LanyardViewer($('#viewer'), { mode: 'config' });
   viewer.apply(state, product);
@@ -80,12 +81,31 @@ async function init() {
 }
 const requestIdle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 800 }) : setTimeout(fn, 200));
 
+// Mise en scène de chaque catégorie (hero de l'accueil et vignettes) par le même moteur.
+function showcaseState(catId) {
+  const base = sanitize(product, { ...defaultState('classic'), kit: 'lanyard', breakaway: 'none' });
+  const front = { ...state.front, scale: 78, spacing: 120 };
+  const s = { ...base, front, back: front, width: 25, buckle: 'detachable', attachment: 'snaphook' };
+  if (catId === 'wristbands') return { ...s, modelDef: { pose: 'band', profile: 'flat' }, length: 330, width: 15, buckle: 'none', attachment: 'none', front: { ...front, spacing: 70 }, back: { ...front, spacing: 70 } };
+  if (catId === 'keystraps') return { ...sanitize(product, { ...defaultState('wrist'), kit: 'lanyard' }), front, back: front, attachment: 'snaphook' };
+  if (catId === 'holders') return { ...s, showcase: 'holder', pass: { ...s.pass, role: 'ACCESS' } };
+  if (catId === 'badges') return { ...s, showcase: 'badge', pass: { ...s.pass, role: 'STAFF' } };
+  if (catId === 'passes') return { ...s, showcase: 'pass', pass: { ...s.pass, role: 'VIP' } };
+  return s;
+}
+
 function renderModelThumbs() {
   for (const m of product.models) {
     const s = sanitize(product, { ...defaultState(m.id), kit: 'lanyard' });
     studio.apply(s, product);
     modelThumbs[m.id] = studio.snapshot('front');
   }
+  studio.setSize(420, 260);
+  for (const c of product.categories) {
+    studio.apply(showcaseState(c.id), product);
+    catThumbs[c.id] = studio.snapshot(['holders', 'badges', 'passes'].includes(c.id) ? 'front' : 'threeq');
+  }
+  studio.setSize(360, 460);
   renderCategories();
   if (currentPage === 'config') { renderRail(); if (STEPS[step].id === 'model') renderPanel(); }
 }
@@ -360,6 +380,21 @@ function renderRail() {
   } else rail.innerHTML = '';
 }
 
+function showHero(i) {
+  const cats = product.categories;
+  heroCat = (i + cats.length) % cats.length;
+  const c = cats[heroCat];
+  const framing = { lanyards: [0.2, 0.74], keystraps: [0.05, 0.95], wristbands: [0, 1.45] }[c.id] || [0, 1.25];
+  hero.heroFocus = framing[0]; hero.heroZoom = framing[1];
+  hero.heroTilt = ['holders', 'badges', 'passes'].includes(c.id) ? { x: -0.15, y: -0.5, z: 0.12 } : c.id === 'wristbands' ? { x: 0.5, y: -0.4, z: 0.2 } : null;
+  hero.apply(showcaseState(c.id), product);
+  hero.setView('hero', true);
+  $('#heroIndex').textContent = String(heroCat + 1).padStart(2, '0');
+  $('#heroTotal').textContent = String(cats.length).padStart(2, '0');
+  $('#heroModel').textContent = c.name + (c.active ? '' : ' · bientôt');
+  $$('#homeCats .cat').forEach((b) => b.classList.toggle('is-on', b.dataset.cat === c.id));
+}
+
 function renderCategories() {
   const svg = {
     wristbands: '<svg viewBox="0 0 48 48"><ellipse cx="24" cy="24" rx="16" ry="9"/><ellipse cx="24" cy="27" rx="16" ry="9"/></svg>',
@@ -367,9 +402,9 @@ function renderCategories() {
     badges: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="14"/><path d="M24 15c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11Z"/></svg>',
     passes: '<svg viewBox="0 0 48 48"><rect x="14" y="8" width="20" height="32" rx="3"/><path d="M19 30h10M21 13h6"/></svg>',
   };
-  const card = (c, big) => `<button class="cat ${c.active ? '' : 'soon'} ${big ? 'big' : ''}" data-cat="${c.id}" ${c.active ? '' : 'aria-disabled="true"'}>
-      <span class="thumb">${c.active && modelThumbs[c.model || 'classic'] ? `<img src="${modelThumbs[c.model || 'classic']}" alt="">` : svg[c.id] || ''}</span>
-      <b>${c.name}</b><small>${c.active ? c.sub : 'Bientôt'}</small>${c.active ? '<i class="go">→</i>' : ''}</button>`;
+  const card = (c, big) => `<button class="cat ${c.active ? '' : 'soon'} ${big ? 'big' : ''} ${!big && product.categories[heroCat]?.id === c.id ? 'is-on' : ''}" data-cat="${c.id}" ${c.active ? '' : 'aria-disabled="true"'}>
+      <span class="thumb">${catThumbs[c.id] ? `<img src="${catThumbs[c.id]}" alt="">` : svg[c.id] || ''}</span>
+      <b>${c.name}</b>${big ? `<small>${c.active ? c.sub : 'Bientôt'}</small>` : ''}</button>`;
   $('#catGrid').innerHTML = product.categories.map((c) => card(c, true)).join('');
   $('#homeCats').innerHTML = product.categories.map((c) => card(c, false)).join('');
 }
@@ -519,15 +554,7 @@ function bindGlobal() {
         const ids = product.models.map((m) => m.id), i = ids.indexOf(state.model);
         selectModel(ids[(i + (t.id === 'nextModel' ? 1 : -1) + ids.length) % ids.length]); break;
       }
-      case 'heroNext': {
-        const ids = product.models.map((m) => m.id);
-        const i = (ids.indexOf(hero.state.model) + 1) % ids.length;
-        const s = sanitize(product, { ...defaultState(ids[i]), front: state.front, color: state.color });
-        hero.apply(s, product); hero.setView('hero', true);
-        $('#heroIndex').textContent = String(i + 1).padStart(2, '0');
-        $('#heroModel').textContent = modelOf(product, ids[i]).name;
-        break;
-      }
+      case 'heroNext': showHero(heroCat + 1); break;
       case 'importLogo': $('#logoFile').click(); break;
       case 'removeLogo': { const s = state[sideKey()]; s.logoImage = null; s.logoName = null; s.logoData = null; state.logoVersion++; refresh(); renderPanel(); break; }
       case 'addProject': {

@@ -138,6 +138,15 @@ export function motifForSide(side, widthMM, ppm, method) {
   return { canvas: out, lengthMM: out.width / ppm, heightMM: out.height / ppm };
 }
 
+// Liseré : deux filets parallèles aux bords du ruban.
+function drawEdges(ctx, w, h, ppm, color) {
+  if (!color) return;
+  const t = Math.max(1, 0.9 * ppm), inset = Math.max(1, 0.7 * ppm);
+  ctx.fillStyle = color;
+  ctx.fillRect(0, inset, w, t);
+  ctx.fillRect(0, h - inset - t, w, t);
+}
+
 // Texture d'une face du ruban. Mode répétition : une tuile (entraxe) répétée le long de u.
 export function stripTexture({ side, widthMM, lengthMM, drop, method, maxTex = 4096 }) {
   const bg = side.bg;
@@ -151,6 +160,7 @@ export function stripTexture({ side, widthMM, lengthMM, drop, method, maxTex = 4
     c.width = Math.max(4, Math.round(pitch * ppm)); c.height = Math.max(4, Math.round(widthMM * ppm));
     const ctx = c.getContext('2d');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, c.width, c.height);
+    if (side.enabled) drawEdges(ctx, c.width, c.height, ppm, side.edge);
     if (hasArt) {
       const m = motifForSide(side, widthMM, ppm, method);
       ctx.drawImage(m.canvas, Math.round((c.width - m.canvas.width) / 2), Math.round((c.height - m.canvas.height) / 2));
@@ -162,6 +172,7 @@ export function stripTexture({ side, widthMM, lengthMM, drop, method, maxTex = 4
   c.width = Math.round(lengthMM * ppm); c.height = Math.max(4, Math.round(widthMM * ppm));
   const ctx = c.getContext('2d');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, c.width, c.height);
+  if (side.enabled) drawEdges(ctx, c.width, c.height, ppm, side.edge);
   if (hasArt) {
     const m = motifForSide(side, widthMM, ppm, method);
     const at = Math.min(drop * 0.45, lengthMM * 0.25) + (side.offset || 0);

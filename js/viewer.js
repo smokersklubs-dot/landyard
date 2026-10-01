@@ -19,7 +19,7 @@ export class LanyardViewer {
     r.setPixelRatio(mode === 'studio' ? 1 : Math.min(window.devicePixelRatio, 2));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.NeutralToneMapping;
-    r.toneMappingExposure = 1.02;
+    r.toneMappingExposure = mode === 'hero' ? 0.94 : 1.02;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer = r;
@@ -36,7 +36,7 @@ export class LanyardViewer {
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.9;
 
-    this.camera = new THREE.PerspectiveCamera(mode === 'hero' ? 26 : 28, 1, 5, 20000);
+    this.camera = new THREE.PerspectiveCamera(mode === 'hero' ? 34 : 28, 1, 5, 20000);
     this.camera.position.set(0, -120, 1400);
     if (mode !== 'studio') {
       this.controls = new OrbitControls(this.camera, r.domElement);
@@ -67,7 +67,7 @@ export class LanyardViewer {
 
     this.keys = {};
     this.explodeT = 0; this.explodeTarget = 0;
-    this.twist = mode === 'hero' ? 0.55 : 0.16;
+    this.twist = mode === 'hero' ? 0.42 : 0.16;
     this.motion = mode !== 'studio';
     this.clock = new THREE.Clock();
     this.time = 0;
@@ -99,25 +99,46 @@ export class LanyardViewer {
   }
 
   setupHero() {
-    const white = new THREE.MeshStandardMaterial({ color: '#f7f7f5', roughness: 0.55 });
-    const blocks = [
-      [520, 900, 220, -560, -200, -700, 0.2, 0.5],
-      [300, 1300, 260, 620, 0, -900, -0.25, -0.4],
-      [900, 120, 500, 120, -620, -300, 0, 0.35],
-      [220, 700, 180, -220, -520, -1100, 0.5, 0.1],
-    ];
+    // Architecture blanche abstraite : éclats, plaques de verre, filets lumineux orange.
     this.decor = new THREE.Group();
-    for (const [w, h, d, x, y, z, rz, ry] of blocks) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), white);
-      m.position.set(x, y, z); m.rotation.set(0, ry, rz); m.receiveShadow = true; m.castShadow = true;
+    const white = new THREE.MeshPhysicalMaterial({ color: '#f6f6f4', roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.2 });
+    const glass = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false });
+    const glow = new THREE.MeshBasicMaterial({ color: '#ff7a1a' });
+    const shard = (r, h, x, y, z, rx, ry, rz, seg = 4) => {
+      const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg, 1), white);
+      m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = true; m.receiveShadow = true;
       this.decor.add(m);
-    }
+    };
+    shard(150, 1500, 640, 80, -900, 0.08, 0.6, -0.12);
+    shard(110, 1100, 900, -180, -700, -0.05, 0.2, 0.2, 3);
+    shard(220, 1800, -900, 160, -1300, 0.1, 0.3, 0.32);
+    shard(90, 900, 380, -380, -1100, 0.4, 0.8, -0.5, 3);
+    shard(160, 700, -420, -560, -800, 1.2, 0.4, 0.9);
+    shard(70, 620, 1050, 300, -500, -0.2, 0.1, 0.5, 3);
+    const slab = (w, h, x, y, z, ry, rz) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 6), glass);
+      m.position.set(x, y, z); m.rotation.set(0, ry, rz);
+      this.decor.add(m);
+    };
+    slab(520, 1300, 520, -50, -560, -0.7, 0.05);
+    slab(360, 900, -700, -120, -700, 0.6, -0.08);
+    const bar = (h, x, y, z, rz) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(5, h, 5), glow);
+      m.position.set(x, y, z); m.rotation.z = rz;
+      this.decor.add(m);
+      const l = new THREE.PointLight('#ff7a1a', 1.2, 900, 1.6); l.position.set(x, y, z + 60); this.decor.add(l);
+    };
+    bar(320, 760, -40, -620, 0.02);
+    bar(180, 980, 260, -1000, -0.1);
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(900, 960, 60, 64), white);
+    floor.position.set(160, -760, -520); floor.receiveShadow = true;
+    this.decor.add(floor);
     this.scene.add(this.decor);
     this.trails = [];
     for (let k = 0; k < 2; k++) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(81 * 3), 3));
-      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.85 }));
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.55 }));
       this.root.add(line);
       this.trails.push(line);
     }
@@ -146,7 +167,7 @@ export class LanyardViewer {
   apply(state, product) {
     this.product = product;
     this.state = state;
-    const model = product.models.find((m) => m.id === state.model);
+    const model = state.modelDef || product.models.find((m) => m.id === state.model);
     const mat = product.materials.find((m) => m.id === state.material);
     const fin = product.finishes.find((f) => f.id === state.finish) || product.finishes[0];
     const method = product.printingMethods.find((m) => m.id === state.method);
@@ -164,12 +185,12 @@ export class LanyardViewer {
     normal.channel = 1;
     const rough = THREE.MathUtils.clamp(mat.roughness + (fin?.roughness || 0), 0.12, 1);
     const base = new THREE.Color(state.color);
-    const sheenColor = base.clone().lerp(new THREE.Color('#ffffff'), 0.35);
+    const sheenColor = base.clone().lerp(new THREE.Color('#ffffff'), 0.14);
     for (const m of [this.mats.front, this.mats.back, this.mats.edge]) {
       m.normalMap = normal;
       m.normalScale.set(mat.normal, mat.normal);
       m.roughness = rough;
-      m.sheen = mat.sheen;
+      m.sheen = mat.sheen * 0.7;
       m.sheenColor.copy(sheenColor);
       m.sheenRoughness = mat.weave === 'satin' ? 0.25 : 0.55;
       m.needsUpdate = true;
@@ -208,7 +229,7 @@ export class LanyardViewer {
     this.mats.metal.clearcoat = metal ? 0 : 0.6;
     this.mats.plastic.color.set(metal ? '#151515' : hwHex);
 
-    const partsKey = JSON.stringify([geomKey, state.breakaway, state.buckle, state.attachment, state.kit, state.holder, state.holderOrientation, state.pass, state.logoVersion]);
+    const partsKey = JSON.stringify([geomKey, state.showcase, state.breakaway, state.buckle, state.attachment, state.kit, state.holder, state.holderOrientation, state.pass, state.logoVersion]);
     if (partsKey !== this.keys.parts || geomChanged) {
       this.keys.parts = partsKey;
       this.buildParts(state, product, model);
@@ -244,6 +265,27 @@ export class LanyardViewer {
       if (part.bottom) cursor = cursor.clone().add(part.bottom);
       return g;
     };
+    // Vitrines sans ruban (porte-badge, badge, pass) : la pièce seule, centrée.
+    const showcase = state.showcase || 'lanyard';
+    this.strapMesh.visible = !['holder', 'badge', 'pass'].includes(showcase);
+    if (!this.strapMesh.visible) {
+      this.chain.position.set(0, 0, 0);
+      const front = toTexture(passCanvas(state.pass, state.front.logoOn ? state.front : null, false), this.renderer);
+      const back = toTexture(passBackCanvas(state.pass, false), this.renderer);
+      front.wrapS = back.wrapS = THREE.ClampToEdgeWrapping;
+      const c = P.card(front, back, product.card, false, this.mats);
+      if (showcase === 'badge') { this.chain.add(c); this.chainBottom = new THREE.Vector3(0, -45, 0); return; }
+      const h = P.holder(showcase === 'pass' ? 'pvcrigid' : 'pvcsoft', false, product.card, this.mats);
+      c.position.copy(h.cardAt);
+      this.chain.add(h.group, c);
+      this.chainBottom = new THREE.Vector3(0, -110, 0);
+      return;
+    }
+    if (model.pose === 'band') {
+      add(P.crimp(w, this.mats, { ring: false }), 'Fermoir', 'Métal', 14);
+      this.chainBottom = this.chain.position.clone();
+      return;
+    }
     const end = state.buckle === 'detachable' ? P.buckle(w, this.mats) : P.crimp(w, this.mats);
     add(end, state.buckle === 'detachable' ? 'Boucle détachable' : 'Embout serti', state.buckle === 'detachable' ? 'Clip plastique' : 'Métal', 14);
     const attDef = product.attachments.find((a) => a.id === state.attachment);
@@ -342,8 +384,8 @@ export class LanyardViewer {
 
   // ---------- Caméra ----------
   bounds() {
-    const box = new THREE.Box3().setFromObject(this.strapMesh);
-    this.chain.updateMatrixWorld(true);
+    this.root.updateMatrixWorld(true);
+    const box = this.strapMesh.visible ? new THREE.Box3().setFromObject(this.strapMesh) : new THREE.Box3();
     box.expandByObject(this.chain);
     if (this.explodeTarget > 0) {
       const extra = Math.max(0, ...(this.explodables || []).map((g) => -g.userData.explode.y)) * (1 - this.explodeT);
@@ -372,7 +414,7 @@ export class LanyardViewer {
         const f = this.strap.frames[Math.round(this.strap.M * 0.9)];
         return at(f.N.clone().add(new THREE.Vector3(0.25, 0.1, 0)), f.p.clone(), 120 + this.strap.params.width * 2);
       }
-      case 'hero': return at(new THREE.Vector3(0.12, 0.08, 1), c.clone().add(new THREE.Vector3(-s.x * 0.06, 0, 0)), dist * 0.92);
+      case 'hero': return at(new THREE.Vector3(0.05, -0.1, 1), c.clone().add(new THREE.Vector3(0, -s.y * (this.heroFocus ?? 0.12), 0)), dist * (this.heroZoom ?? 0.62));
       case 'threeq': return at(new THREE.Vector3(0.75, 0.18, 0.85), c, dist);
       default: return at(new THREE.Vector3(0.18, 0.06, 1), c, dist);
     }
@@ -380,6 +422,7 @@ export class LanyardViewer {
 
   setView(name, instant = false) {
     this.currentView = name;
+    if (this.mode === 'hero') this.heroPose(this.time);
     const v = this.viewFor(name);
     if (instant || !this.controls) {
       this.camera.position.copy(v.pos);
@@ -399,7 +442,22 @@ export class LanyardViewer {
     this.camAnim = { t: 0, fromPos: this.camera.position.clone(), fromTarget: this.controls.target.clone(), toPos: this.controls.target.clone().add(d.setLength(len)), toTarget: this.controls.target.clone() };
   }
 
+  // Lanyard flottant : bas incliné vers la caméra, micro-rotation, flottement.
+  heroPose(t) {
+    const p = this.heroTilt || { x: -0.42, y: -0.32, z: 0.34 };
+    this.root.rotation.set(p.x + Math.sin(t * 0.5) * 0.03, p.y + Math.sin(t * 0.25) * 0.12, p.z);
+    this.root.position.y = Math.sin(t * 0.8) * 6;
+    if (this.decor) this.decor.position.x = Math.sin(t * 0.2) * 12;
+  }
+
   setAutoRotate(on) { if (this.controls) this.controls.autoRotate = on; }
+
+  // Taille fixe (vitrine hors écran) : vignettes portrait ou paysage.
+  setSize(width, height) {
+    this.fixed = { width, height };
+    this.container.style.width = width + 'px'; this.container.style.height = height + 'px';
+    this.resize();
+  }
 
   resize() {
     const w = this.fixed?.width || this.container.clientWidth || 1, h = this.fixed?.height || this.container.clientHeight || 1;
@@ -454,12 +512,7 @@ export class LanyardViewer {
       const low = Math.min(box.min.y, this.chainBottom?.y ?? box.min.y) - (this.holderShown ? 120 : 40);
       this.ground.position.y = lerp(this.ground.position.y, low, 0.2);
     }
-    if (this.mode === 'hero') {
-      this.root.rotation.y = -0.18 + Math.sin(this.time * 0.25) * 0.22;
-      this.root.rotation.z = 0.22;
-      this.root.rotation.x = 0.12;
-      this.root.position.y = Math.sin(this.time * 0.8) * 8;
-    }
+    if (this.mode === 'hero') this.heroPose(this.time);
     if (this.camAnim) {
       const a = this.camAnim;
       a.t = Math.min(1, a.t + dt * 1.6);

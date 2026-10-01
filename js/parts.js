@@ -49,11 +49,12 @@ function swivel(y, mat) {
 }
 
 // ---------- Extrémités du ruban ----------
-export function crimp(width, mats) {
+export function crimp(width, mats, { ring: withRing = true } = {}) {
   const g = new THREE.Group();
   const body = rbox(width + 3.4, 13, 4.4, 1.4, mats.metal);
   body.position.y = -3.5;
   g.add(body);
+  if (!withRing) return { group: g, bottom: null };
   const ring = torus(4.2, 0.95, mats.metal);
   ring.position.y = -10 - 4.2 + 1;
   g.add(ring);

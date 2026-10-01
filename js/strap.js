@@ -46,6 +46,17 @@ function wristPoints(D, stack) {
   return pts;
 }
 
+// Pose « bracelet » : anneau vertical, extrémités superposées en bas (fermoir).
+function bandPoints(D, stack) {
+  const r = D / 2, cy = -r, pts = [], n = 18;
+  for (let k = 0; k <= n; k++) {
+    const a = -Math.PI / 2 + 0.22 - (k / n) * (2 * Math.PI + 0.44);
+    const z = k === 0 ? stack : k === n ? -stack : 0;
+    pts.push(new THREE.Vector3(r * Math.cos(a), cy + r * Math.sin(a), z));
+  }
+  return pts;
+}
+
 // Section : liste de bandes {g: groupe matière, pts: [{x, y, nx, ny, v}]} dans le repère (W, N).
 function makeProfile(kind, w, t) {
   const strips = [];
@@ -99,7 +110,7 @@ export class Strap {
     const p = { pose, profile, length, width, thickness, mirror };
     this.params = p;
     const stack = profile === 'tube' ? width * 0.42 : thickness * 1.05;
-    const build = pose === 'wrist' ? wristPoints : neckPoints;
+    const build = pose === 'wrist' ? wristPoints : pose === 'band' ? bandPoints : neckPoints;
     const curveFor = (D) => new THREE.CatmullRomCurve3(build(D, stack), false, 'centripetal', 0.5);
     let lo = 10, hi = length, curve = null;
     for (let i = 0; i < 30; i++) {
@@ -199,6 +210,11 @@ export class Strap {
       const frontN = FRONT.clone().addScaledVector(radial, 0.3).normalize();
       hang = smooth(-8, -70, p.y);
       nt = ringN.lerp(frontN, hang).normalize();
+    } else if (pose === 'band') {
+      nt = new THREE.Vector3(p.x, p.y + this.drop / 2, 0);
+      if (nt.lengthSq() < 1e-6) nt.set(0, -1, 0);
+      nt.normalize();
+      hang = 0;
     } else {
       nt = FRONT.clone();
     }
