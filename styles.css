@@ -71,6 +71,9 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--ink);
 }
 .wordmark { font-weight: 800; font-size: 21px; letter-spacing: -.02em; font-style: italic; transform: skewX(-4deg); }
 .nav-links { display: flex; gap: 24px; }
+.nav-links a { font-size: 13px; color: var(--ink-2); padding: 6px 0; text-decoration: none; border-bottom: 2px solid transparent; }
+.nav-links a:hover { color: var(--ink); }
+a.icon-btn { color: inherit; }
 .nav-links button { font-size: 13px; color: var(--ink-2); padding: 6px 0; border-bottom: 2px solid transparent; }
 .nav-links button.is-active { color: var(--ink); border-color: var(--accent); }
 .nav-icons { margin-left: auto; display: flex; align-items: center; gap: 6px; }
@@ -415,11 +418,20 @@ textarea.names { width: 100%; padding: 8px 12px; border: 1px solid var(--line); 
 }
 .quote textarea { resize: vertical; }
 .quote input:focus, .quote textarea:focus { border-color: var(--ink); outline: none; }
+.quote .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .form-error { color: #B42318; font-size: 12.5px; }
 .bat-row { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; padding-top: 4px; }
 .bat-view { max-height: 62vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; background: #fff; }
 .bat-view img { display: block; width: 100%; min-width: 640px; }
 .modal { width: min(760px, calc(100vw - 32px)); }
+
+/* ---------- Pied de page (lien vers sklubs.fr) ---------- */
+.site-foot { display: none; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 18px 40px 28px; font-size: 12.5px; color: var(--muted); }
+body:has(#page-home.is-active) .site-foot, body:has(#page-category.is-active) .site-foot { display: flex; }
+.site-foot a { color: var(--ink-2); text-decoration: none; }
+.site-foot a:hover { color: var(--accent); }
+.site-foot nav { display: flex; gap: 20px; flex-wrap: wrap; }
+.foot-back { font-weight: 600; }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 1080px) {
@@ -437,6 +449,7 @@ textarea.names { width: 100%; padding: 8px 12px; border: 1px solid var(--line); 
   .features { margin-top: 8px; gap: 16px; }
   .hero-counter { right: 16px; bottom: 16px; }
   .hero-model { right: 16px; top: auto; bottom: 86px; }
+  .site-foot { padding: 16px; }
   .home-cats { padding: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .page-inner { padding: 24px 16px 40px; }
   .cat-grid { grid-template-columns: repeat(2, 1fr); }

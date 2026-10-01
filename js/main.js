@@ -653,6 +653,7 @@ function openQuote() {
       <div class="field two"><div><label for="qDate">Date de l'événement</label><input id="qDate" name="eventDate" type="date" value="${esc(f.eventDate)}"></div>
         <div><label for="qQty">Quantité</label><input id="qQty" name="quantity" type="number" min="1" value="${state.quantity}"></div></div>
       <div class="field"><label for="qMsg">Message</label><textarea id="qMsg" name="message" rows="3" placeholder="Délais, livraison, questions…">${esc(f.message)}</textarea></div>
+      <div class="hp" aria-hidden="true"><label for="qWebsite">Site web</label><input id="qWebsite" name="website" type="text" tabindex="-1" autocomplete="off"></div>
       <p class="form-error" id="qError" hidden></p>
     </div>`, '<button class="btn primary" id="sendQuote" value="send">Envoyer la demande <span class="arrow">→</span></button>');
   $('#sendQuote').onclick = (e) => { e.preventDefault(); sendQuote(); };
@@ -677,36 +678,61 @@ async function sendQuote() {
   const proj = { ...buildProject(), reference: projectRef(), contact: data };
   const q = CONFIG.quote;
   const btn = $('#sendQuote');
-  if (!q.accessKey || window.SKLUBS_PREVIEW) {
+  const offline = () => {
     $('#modal').close();
     exportProject(proj);
-    if (!window.SKLUBS_PREVIEW) { downloadBAT(); toast("Envoi en ligne pas encore activé : votre dossier est téléchargé, envoyez-le à l'équipe SKLUBS."); }
+    if (!window.SKLUBS_PREVIEW) downloadBAT();
     track('quote_requested', { mode: 'download' });
+  };
+  const ready = q.provider === 'wordpress' ? !!q.endpoint : !!q.accessKey;
+  if (!ready || window.SKLUBS_PREVIEW) {
+    offline();
+    if (!window.SKLUBS_PREVIEW) toast("Envoi en ligne pas encore activé : votre dossier est téléchargé, envoyez-le à l'équipe SKLUBS.");
     return;
   }
   btn.disabled = true; btn.textContent = 'Envoi…';
   try {
     const { preview_image, logo_files, ...light } = proj;
+    const blob = async (url) => (await fetch(url)).blob();
     const fd = new FormData();
-    if (q.provider === 'web3forms') { fd.append('access_key', q.accessKey); fd.append('from_name', 'Configurateur SKLUBS'); }
-    fd.append('subject', `${q.subject} — ${data.company || data.name} (${proj.reference})`);
     fd.append('name', data.name); fd.append('email', data.email);
-    fd.append('message', quoteSummary(data, proj));
-    fd.append('configuration_json', JSON.stringify(light, null, 2));
-    if (q.attachFiles) {
+    if (q.provider === 'wordpress') {
+      for (const k of ['company', 'phone', 'message', 'quantity']) fd.append(k, data[k] || '');
+      fd.append('event_date', data.eventDate || '');
+      fd.append('website', data.website || '');
+      fd.append('reference', proj.reference);
+      fd.append('summary', recap().map(([a, b]) => `${a} : ${b}`).join('\n'));
+      fd.append('configuration', JSON.stringify(light));
       const bat = makeBAT();
-      fd.append('attachment', await batPDF(bat), `BAT-${proj.reference}.pdf`);
-      fd.append('attachment_preview', await (await fetch(preview_image)).blob(), `apercu-${proj.reference}.png`);
-      for (const l of logo_files) if (l.data_url) fd.append('attachment_logo', await (await fetch(l.data_url)).blob(), l.name);
+      fd.append('bat', await batPDF(bat), `BAT-${proj.reference}.pdf`);
+      fd.append('bat_svg', new Blob([bat.svg], { type: 'image/svg+xml' }), `BAT-${proj.reference}.svg`);
+      fd.append('preview', await blob(preview_image), `apercu-${proj.reference}.png`);
+      const [front, back] = [state.front, state.back];
+      if (front.logoData) fd.append('logo', await blob(front.logoData), front.logoName);
+      if (state.backMode === 'different' && back.logoData) fd.append('logo_back', await blob(back.logoData), back.logoName);
+      if (state.kit === 'pass' && state.passArt?.logoData) fd.append('pass_art', await blob(state.passArt.logoData), state.passArt.logoName);
+    } else {
+      if (q.provider === 'web3forms') { fd.append('access_key', q.accessKey); fd.append('from_name', 'Configurateur SKLUBS'); }
+      fd.append('subject', `${q.subject} — ${data.company || data.name} (${proj.reference})`);
+      fd.append('message', quoteSummary(data, proj));
+      fd.append('configuration_json', JSON.stringify(light, null, 2));
+      if (q.attachFiles) {
+        fd.append('attachment', await batPDF(makeBAT()), `BAT-${proj.reference}.pdf`);
+        fd.append('attachment_preview', await blob(preview_image), `apercu-${proj.reference}.png`);
+        for (const l of logo_files) if (l.data_url) fd.append('attachment_logo', await blob(l.data_url), l.name);
+      }
     }
     const res = await fetch(q.endpoint, { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(res.status);
+    const out = await res.json().catch(() => ({}));
+    if (res.status === 404) { offline(); toast("Le service de devis n'est pas encore installé : votre dossier est téléchargé, envoyez-le à l'équipe SKLUBS."); return; }
+    if (!res.ok) throw Object.assign(new Error(out.message || res.status), { userMessage: out.message });
     $('#modal').close();
-    toast(`Demande ${proj.reference} envoyée. L'équipe SKLUBS vous répond par e-mail.`);
-    track('quote_requested', { mode: 'email', reference: proj.reference });
-  } catch {
+    const ref = out.reference || proj.reference;
+    toast(`Demande ${ref} envoyée. Un e-mail de confirmation vous a été adressé.`);
+    track('quote_requested', { mode: q.provider, reference: ref });
+  } catch (e) {
     btn.disabled = false; btn.innerHTML = 'Envoyer la demande <span class="arrow">→</span>';
-    err.textContent = "L'envoi a échoué. Vérifiez votre connexion et réessayez."; err.hidden = false;
+    err.textContent = e.userMessage || "L'envoi a échoué. Vérifiez votre connexion et réessayez."; err.hidden = false;
   }
 }
 

@@ -1,15 +1,15 @@
 // Réglages de mise en ligne — seul fichier à modifier pour brancher les devis.
 export const CONFIG = {
-  // Envoi des demandes de devis par e-mail via un service de formulaire.
+  // Demandes de devis : enregistrées dans WordPress (plugin « SKLUBS Event Quotes » sur sklubs.fr),
+  // avec BAT, logo et aperçu, puis e-mail à l'équipe et accusé de réception au client.
   quote: {
-    provider: 'web3forms',                         // 'web3forms' ou 'formspree'
-    endpoint: 'https://api.web3forms.com/submit',  // Formspree : https://formspree.io/f/<id>
-    accessKey: null,                               // clé Web3Forms (créée avec l'adresse qui reçoit les devis)
-    // Pièces jointes (BAT PDF, logo, aperçu, projet JSON) : offre payante du service.
-    // false : l'e-mail contient le récapitulatif et le JSON, le client télécharge une copie du dossier.
-    attachFiles: false,
+    provider: 'wordpress',                                  // 'wordpress', 'web3forms' ou 'formspree'
+    endpoint: 'https://sklubs.fr/wp-json/sklubs/v1/quote',
+    accessKey: null,                                        // seulement pour Web3Forms / Formspree
+    attachFiles: true,                                      // le plugin WordPress accepte les fichiers
     subject: 'Demande de devis — Lanyard SKLUBS',
   },
+  site: 'https://sklubs.fr',
   // Analytics : les événements sont poussés dans window.dataLayer (Google Tag Manager, GA4, etc.).
   analytics: true,
 };

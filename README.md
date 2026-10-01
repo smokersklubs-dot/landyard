@@ -14,10 +14,9 @@ Site statique, aucune étape de build. Three.js est servi depuis `vendor/` (aucu
 2. **Domaine** : *Project → Settings → Domains*, ajouter `landyard.sklubs.fr`.
    Chez le gestionnaire DNS de `sklubs.fr`, créer l'enregistrement indiqué par Vercel
    (en général `CNAME landyard → cname.vercel-dns.com`). HTTPS est automatique.
-3. **Devis par e-mail** : créer une clé sur <https://web3forms.com> avec l'adresse qui doit recevoir les devis,
-   puis la coller dans `js/config.js` (`quote.accessKey`) et pousser. Vercel redéploie tout seul.
-   Tant que la clé est vide, « Demander un devis » télécharge le dossier (JSON, aperçu PNG, BAT PDF + SVG).
-   Les pièces jointes (BAT, logo) nécessitent l'offre payante du service : mettre `attachFiles: true`.
+3. **Devis** : installer le plugin WordPress `wordpress-plugin/sklubs-event-quotes.zip` sur sklubs.fr.
+   Les demandes arrivent dans l'admin (menu « Devis Event ») avec BAT, logo et aperçu, plus un e-mail à l'équipe.
+   Guide pas à pas : [`docs/INSTALLATION_SKLUBS_FR.md`](docs/INSTALLATION_SKLUBS_FR.md).
 4. **Analytics** (facultatif) : ajouter le snippet Google Tag Manager / GA4 dans `index.html` ;
    les événements du configurateur sont déjà poussés dans `window.dataLayer`.
 
@@ -67,7 +66,8 @@ ou glisser-déposer d'un fichier n'importe où sur la page. Il est appliqué au 
 | `js/main.js` | Écrans, état, panneaux, export projet |
 | `js/hardware.js` | Chargement des pièces Blender (GLB), points d'accroche nommés, repli procédural |
 | `js/bat.js` | BAT usine : ruban à plat à l'échelle 1 (recto, verso, cotes, spécifications, couleurs, pass) en SVG et PDF |
-| `js/config.js` | Réglages de mise en ligne : clé du service de formulaire, analytics |
+| `js/config.js` | Réglages de mise en ligne : point d'envoi des devis (sklubs.fr), analytics |
+| `wordpress-plugin/` | Plugin WordPress « SKLUBS Event Quotes » (source + .zip à installer sur sklubs.fr) |
 | `hardware-master/` | Pièces 3D Blender (script `scripts/build_hardware.py`, `.blend`, un GLB par pièce) |
 | `vendor/three/` | Three.js 0.170 (licence MIT) servi avec le site |
 | `vercel.json` | En-têtes de cache et de sécurité pour Vercel |
@@ -105,7 +105,7 @@ le configurateur affiche **Validation usine requise** au lieu d'un prix.
 - Compatibilités matière / méthode / attache (`rules`) : brouillon technique à valider.
 - Largeurs et longueurs réellement disponibles par modèle, épaisseurs textiles.
 - Nuancier usine et couleurs métal disponibles.
-- Clé du service de formulaire (`js/config.js`) et adresse de réception des devis.
+- Adresse(s) de réception des devis : à saisir dans WordPress, Devis Event → Réglages.
 - Logo officiel SKLUBS en SVG (le mot SKLUBS est actuellement composé en texte).
 
 ## Fichier projet exporté
