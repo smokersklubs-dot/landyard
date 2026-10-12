@@ -130,7 +130,7 @@
     "_status": "TO_DEFINE_FACTORY"
   },
 
-  "quantity": { "tiers": [100, 250, 500, 1000, 2500, 5000], "default": 500, "moq": null },
+  "quantity": { "tiers": [100, 250, 500, 1000, 2500, 5000], "default": 500, "moq": 100, "_moq": "Minimum de commande par défaut (marché : 50 à 250 pièces). La valeur saisie dans Devis Event → Prix la remplace." },
 
   "pricing": {
     "_status": "TO_DEFINE — aucun prix n'est inventé. Remplir ces champs active le calcul instantané.",

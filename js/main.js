@@ -4,7 +4,7 @@ import { loadHardware } from './hardware.js';
 import { buildBAT, batPDF, svgToCanvas } from './bat.js';
 import { CONFIG } from './config.js';
 import { ensureFonts, stripTexture, flatPreview, ORANGE, rasterizeLogo, hasLightBackground, removeLightBackground } from './artwork.js';
-import { sanitize, computePrice, allowedMethods, allowedAttachments, canHoldBadge, modelOf } from './pricing.js';
+import { sanitize, computePrice, allowedMethods, allowedAttachments, canHoldBadge, modelOf, minQuantity } from './pricing.js';
 
 const PRODUCT_URL = 'products/lanyard/product.json';
 const STORE_KEY = 'sklubs-lanyard-v1';
@@ -360,11 +360,14 @@ function renderPanel() {
     }
   }
   if (id === 'qty') {
-    html = `<table class="tiers"><thead><tr><th>Quantité</th><th>Prix unitaire HT</th></tr></thead><tbody>${product.quantity.tiers.map((q) => {
+    const moq = minQuantity(product);
+    const tiers = [...new Set([moq, ...product.quantity.tiers].filter((q) => q >= moq))].sort((a, b) => a - b);
+    html = `<table class="tiers"><thead><tr><th>Quantité</th><th>Prix unitaire HT</th></tr></thead><tbody>${tiers.map((q) => {
         const p = computePrice(product, state, q);
         return `<tr class="${q === state.quantity ? 'is-on' : ''}" data-qty="${q}"><td>${q.toLocaleString('fr-FR')} pcs</td><td>${p.status === 'factory' ? '<span class="muted">Sur devis</span>' : fmt(p.unit, p.currency)}${q === 500 ? '<em>Le plus populaire</em>' : ''}</td></tr>`;
       }).join('')}</tbody></table>
-      <div class="field inline"><label>Quantité libre</label><input type="number" id="qtyInput" min="1" step="1" value="${state.quantity}"></div>
+      <div class="field inline"><label>Quantité libre</label><input type="number" id="qtyInput" min="${moq}" step="1" value="${state.quantity}"></div>
+      ${moq > 1 ? `<p class="note moq" id="moqNote">Minimum de commande : <b>${moq.toLocaleString('fr-FR')} pièces</b>.</p>` : ''}
       <div class="price-big" id="priceBig"></div>
       ${cartReady() ? '<button class="btn primary wide" id="addCart">Ajouter au panier <span class="arrow">→</span></button><button class="btn outline wide" id="addProject">Ajouter au projet</button>' : '<button class="btn primary wide" id="addProject">Ajouter au projet <span class="arrow">→</span></button>'}
       <p class="note">Prix estimatifs, validation usine incluse. ${computePrice(product, state).status === 'factory' ? 'Tarifs fournisseur non renseignés : chaque projet est validé et chiffré par l\'usine.' : ''}</p>`;
@@ -656,7 +659,7 @@ function openQuote() {
       <div class="field two"><div><label for="qEmail">E-mail *</label><input id="qEmail" name="email" type="email" required value="${esc(f.email)}" autocomplete="email"></div>
         <div><label for="qPhone">Téléphone</label><input id="qPhone" name="phone" type="tel" value="${esc(f.phone)}" autocomplete="tel"></div></div>
       <div class="field two"><div><label for="qDate">Date de l'événement</label><input id="qDate" name="eventDate" type="date" value="${esc(f.eventDate)}"></div>
-        <div><label for="qQty">Quantité</label><input id="qQty" name="quantity" type="number" min="1" value="${state.quantity}"></div></div>
+        <div><label for="qQty">Quantité</label><input id="qQty" name="quantity" type="number" min="${minQuantity(product)}" value="${state.quantity}"></div></div>
       <div class="field"><label for="qMsg">Message</label><textarea id="qMsg" name="message" rows="3" placeholder="Délais, livraison, questions…">${esc(f.message)}</textarea></div>
       <div class="hp" aria-hidden="true"><label for="qWebsite">Site web</label><input id="qWebsite" name="website" type="text" tabindex="-1" autocomplete="off"></div>
       <p class="form-error" id="qError" hidden></p>
@@ -678,7 +681,7 @@ async function sendQuote() {
   if (!data.name?.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email || '')) {
     err.textContent = 'Indiquez votre nom et une adresse e-mail valide.'; err.hidden = false; return;
   }
-  state.quantity = Math.max(1, Math.round(Number(data.quantity) || state.quantity));
+  state.quantity = Math.max(minQuantity(product), Math.round(Number(data.quantity) || state.quantity));
   store.set('sklubs-contact', { ...data, quantity: undefined });
   const proj = { ...buildProject(), reference: projectRef(), contact: data };
   const q = CONFIG.quote;
@@ -757,7 +760,7 @@ async function loadWooPricing() {
     if (!d?.pricing) return;
     const { moq, baseLengthByModel, ...pricing } = d.pricing;
     product.pricing = { ...product.pricing, ...pricing, priceMode: 'instant' };
-    product.quantity.moq = moq ?? null;
+    if (moq !== null && moq !== undefined && moq !== '') product.quantity.moq = moq;
     wooCart = !!d.cart;
     applyCatalog(d.catalog?.disabled || {});
   } catch { /* sklubs.fr injoignable : « Sur devis » */ }
@@ -957,7 +960,12 @@ function bindGlobal() {
       if (v >= m.customLength[0] && v <= m.customLength[1]) { state.length = v; refresh(); $('#dropOut').textContent = Math.round(viewer.strap.drop / 10) + ' cm'; }
       return;
     }
-    if (el.id === 'qtyInput') { const q = Math.max(1, Math.round(Number(el.value) || 1)); state.quantity = q; refresh(); $('#priceBig').innerHTML = bigPrice(); $$('.tiers tr').forEach((r) => r.classList.toggle('is-on', Number(r.dataset.qty) === q)); return; }
+    if (el.id === 'qtyInput') {
+      const moq = minQuantity(product);
+      const q = Math.max(moq, Math.round(Number(el.value) || moq));
+      $('#moqNote')?.classList.toggle('is-warn', Number(el.value) < moq);
+      if (e.type === 'change') el.value = q;
+      state.quantity = q; refresh(); $('#priceBig').innerHTML = bigPrice(); $$('.tiers tr').forEach((r) => r.classList.toggle('is-on', Number(r.dataset.qty) === q)); return; }
     if (el.id === 'hwCustom') { state.hardwareColor = 'custom'; state.hardwareHex = el.value; refresh(); if (e.type === 'change') renderPanel(); return; }
     const k = el.dataset.k;
     if (!k) return;
@@ -973,7 +981,7 @@ function bindGlobal() {
     if (el.type === 'checkbox' || (e.type === 'change' && el.type !== 'range' && el.type !== 'text')) renderPanel();
   };
   document.addEventListener('input', onInput);
-  document.addEventListener('change', (e) => { if (e.target.type === 'checkbox' || e.target.type === 'color' || e.target.id === 'hwCustom') onInput(e); });
+  document.addEventListener('change', (e) => { if (e.target.type === 'checkbox' || e.target.type === 'color' || e.target.id === 'hwCustom' || e.target.id === 'qtyInput') onInput(e); });
 
   $('#passFile').addEventListener('change', (e) => {
     const f = e.target.files[0]; e.target.value = '';

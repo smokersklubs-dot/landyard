@@ -17,6 +17,12 @@ export function allowedAttachments(product, modelId) {
   return product.attachments.filter((a) => ids.includes(a.id));
 }
 
+// Quantité minimum de commande : celle de WordPress, sinon celle de product.json.
+export const minQuantity = (product) => {
+  const m = Number(product.quantity?.moq);
+  return isDefined(product.quantity?.moq) && m > 0 ? Math.round(m) : 1;
+};
+
 export const canHoldBadge = (product, cfg) =>
   modelOf(product, cfg.model).pose === 'neck' && product.rules.holderNeedsAttachment.includes(cfg.attachment);
 
@@ -42,6 +48,7 @@ export function sanitize(product, cfg) {
   if (!canHoldBadge(product, cfg)) cfg.kit = 'lanyard';
   if (cfg.kit !== 'lanyard' && cfg.holder === 'none') cfg.holder = product.holders.find((h) => h.id !== 'none')?.id || 'none';
   if (cfg.kit !== 'lanyard' && cfg.holder === 'none') cfg.kit = 'lanyard';
+  cfg.quantity = Math.max(minQuantity(product), Math.round(Number(cfg.quantity) || 0));
   return cfg;
 }
 
